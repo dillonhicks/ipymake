@@ -1,0 +1,64 @@
+<dski>
+output_base = "./tmp/sigpipe_gsched_ccsm.dski.bin"
+child = "./sigpipe_gsched_ccsm --threads=4 --stimuli=500 -g -c --dsui-output ./tmp/sigpipe_gsched_ccsm.dsui.bin"
+
+<channels>
+chan1 = {
+	buffer_size = 500000,
+	buffer_count = 50
+}
+chan2 = {
+	buffer_size = 500000,
+	buffer_count = 50
+}
+
+<datastreams>
+dski_nofilter = {
+	channel = chan1
+	filters = []
+	enabled = {
+		GSCHED = [
+		       GRP_CREATE,
+                       GRP_JOIN,
+                       GRP_SET,
+		       GRP_LEAVE,
+		       GRP_DESTROY,
+                       MEM_JOIN,
+		       MEM_SET,
+                       MEM_LEAVE
+                ]
+
+                CCSM = [
+		     SET_CREATE,
+		     SET_DESTROY,
+                     COMP_CREATE,
+                     COMP_DESTROY,
+		     ADD,
+		     REMOVE,
+		     DELETE
+                ]
+	}
+}
+
+dski_filtered = {
+	channel = chan2
+	filters = [
+		task( 
+			ccsm_name = "pipeline_group"
+		)
+	]
+	enabled = {
+		SCHEDULER = [
+			SWITCH_TO,
+			SWITCH_FROM
+		]
+		FORK = [
+			DO_FORK
+		]
+                SDF_SEQ = [
+                        SCHED_CHOICE,
+			CHANGE_PRIO
+		]
+
+	}
+}

@@ -1,0 +1,25 @@
+<main>
+filters = {
+	f1 = [
+		head.input(
+			file = ["data/*.bin"]
+			namespace = {
+				OCA = {
+					entities = {
+						ACTIONS = event(
+							desc = "oca action event"
+						)
+					}
+				}
+			}
+		)
+
+		utility.timestamp()		
+		discovery_pre_process.oca_event_creator()
+		#discovery_pre_process.intermediate_filter_to_NX()
+		nx1.discovery_graph(
+			#pretty_print = true,
+			#debug_level = 1
+		)
+	]
+}

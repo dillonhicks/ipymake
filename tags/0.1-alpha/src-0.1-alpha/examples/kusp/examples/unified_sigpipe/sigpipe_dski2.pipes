@@ -1,0 +1,254 @@
+#some intro to the example
+
+<main>
+filter_modules = ["sigpipe_dsui_filter.py"]
+filters = {
+	dsui = [
+		head.input(
+			file = ["sigpipe.dsui.bin"]
+			namespace = {
+				GAP_INTERVALS = {
+					entities = {
+						GAP_ONE = interval(
+							desc = "gap one intervals"
+						)
+						ALL_GAPS = interval(
+							desc = "all gaps intervals"
+						)
+					}
+				}
+				GAP_HISTOS = {
+					entities = {
+						GAP_ONE_HISTO = histogram(
+							desc = "gap one histogram"
+							units = "ns" 
+						)
+						ALL_GAPS_HISTO = histogram(
+							desc = "all gaps histogram"
+							units = "ns" 
+						)
+					}
+				}
+				PIPE_INTERVAL = {
+					entities = {
+						PIPE = interval(
+							desc = "time for a signal to clear the whole pipeline"
+						)
+					}
+				}
+				PIPE_HISTO = {
+					entities = {
+						PIPE_HISTO = histogram(
+							desc = "pipe traversal histogram"
+							units = "ns" 
+						)
+					}
+				}
+			}
+		)
+
+		utility.timestamp()
+		  
+	]
+	
+	#These are the DSKI context switch events. We will use this filter to 
+	#access the unfiltered context switch events--that is, all context switch
+	#events that occur, including those not created by the sigpipe example.
+	dski = [
+		head.input(
+			file = ["sigpipe2.dski.bin/chan1/cpu*.bin"]
+			namespace = {
+				CPU_TIME_UF = {
+					entities = {
+						TIME_INTERVAL = interval(
+							desc = "cpu time intervals"
+						)
+					}
+				}
+			}
+		)
+
+		utility.timestamp()
+		
+		#The split_outputs module in utility2 is designed to enable, as the name
+		#implies, the splitting of output. This sends the whole datastream to 
+		#all of the designated output pipelines. 
+		utility2.split_outputs(
+		    outputs = ["count_uf", "unfiltered_cpu_time"]
+		)
+		
+	]
+	
+	#These are also DSKI events, but from chan2, and so have been run
+	#through the active filter. These context switch events include only those
+	#spawned by the sigpipe example.
+	dski_filter = [
+		head.input(
+			file = ["sigpipe2.dski.bin/chan2/cpu*.bin"]
+			namespace = {
+				CPU_TIME_F = {
+					entities = {
+						TIME_INTERVAL = interval(
+							desc = "cpu time intervals"
+						)
+					}
+				}
+			}
+		)
+
+		utility.timestamp()
+	    
+	    utility2.split_outputs(
+		    outputs = ["count_f", "filtered_cpu_time"]
+		)
+
+	]
+	
+	#This is the same filter as in sigpipe DSUI
+	custom = [
+		head.input(
+			conn = [dsui]
+		)
+
+		sigpipe_dsui_filter.pipeline_intervals(
+			gap_one_interval = "GAP_INTERVALS/GAP_ONE"
+			all_gaps_intervals = "GAP_INTERVALS/ALL_GAPS"
+			pipeline_interval = "PIPE_INTERVAL/PIPE"
+			consume = true
+		)
+		
+		utility2.split_outputs(
+		    outputs = ["create_histograms"]
+		)
+		
+	]
+	
+	#This is the same filter as in sigpipe DSUI
+	create_histograms = [
+		head.input(
+			conn = [custom]
+		)
+
+		conversion.interval_to_histogram(
+			interval = "GAP_INTERVALS/GAP_ONE"
+			histogram = "GAP_HISTOS/GAP_ONE_HISTO"
+			buckets = 25
+		)
+
+		conversion.interval_to_histogram(
+			interval = "GAP_INTERVALS/ALL_GAPS"
+			histogram = "GAP_HISTOS/ALL_GAPS_HISTO"
+			buckets = 25
+		)
+
+		conversion.interval_to_histogram(
+			interval = "PIPE_INTERVAL/PIPE"
+			histogram = "PIPE_HISTO/PIPE_HISTO"
+			buckets = 50
+		)
+	]
+	
+	#This is the same filter as in sigpipe DSUI
+	create_graphs = [
+		head.input(
+			conn = [create_histograms]
+		)
+
+		graph.histogram(
+			histogram = "GAP_HISTOS/GAP_ONE_HISTO"
+			title = "gap one histogram"
+		)
+
+		graph.histogram(
+			histogram = "GAP_HISTOS/ALL_GAPS_HISTO"
+			title = "all gaps histogram"
+		)
+
+		graph.histogram(
+			histogram = "PIPE_HISTO/PIPE_HISTO"
+			title = "total pipeline traversal time"
+		)
+
+	]
+
+    #Count the total number of events in the unfiltered datastream
+	count_uf = [
+		head.input(
+			conn = [dski]
+		)
+
+		utility2.count()
+		
+	]
+	
+	#Here we count the number of events in the filtered datastream 
+	#This should be much lower.
+	count_f = [
+	    head.input(
+	        conn = [dski_filter]
+	    )
+	    
+	    utility2.count()
+	]
+    
+    #These DSKI events have not gone through the active filter. Thus, these 
+	#events are every single context switch event. You will be able to notice
+	#the difference in the histograms. Not only will the volume of data be much
+	#lower here, but the distribution will be different. 
+	unfiltered_cpu_time = [
+		head.input(
+			conn = [dski]
+		)
+
+		conversion2.dski_event_to_interval(
+            start_event = "SCHEDULER/SWITCH_FROM"
+            end_event = "SCHEDULER/SWITCH_TO"
+            interval = "CPU_TIME_UF/TIME_INTERVAL"
+            consume = true
+            ignore_missing = true
+        )
+
+		graph.interval_histogram(
+			interval = "CPU_TIME_UF/TIME_INTERVAL"
+			title = "CPU time for unfiltered data"
+			filename = "CPU_TIME_UF_AF.ps"
+			xaxis_label = "Time interval spent on CPU (us)"
+			yaxis_log = true
+			divisor = 1000
+			buckets = 30
+		)
+	]
+	
+	#This pipeline gets entities from the dski_filter pipeline. The dski_filter 
+	#pipeline contains only DSKI events which were passed through the active filter. 
+    #This active filter only keeps the context switch events from its child 
+    #process: the running of sigpipe. Again, the differences between the 
+    #filtered and unfiltered datastreams can be noted in their respective 
+    #histogram graphs.
+    
+    #You can note that it is much easier to access the filtered data in this 
+    #manner than creating a custom filter to get the thread PIDs.
+	filtered_cpu_time = [
+		head.input(
+			conn = [dski_filter]
+		)
+
+        conversion2.dski_event_to_interval(
+            start_event = "SCHEDULER/SWITCH_FROM"
+            end_event = "SCHEDULER/SWITCH_TO"
+            interval = "CPU_TIME_F/TIME_INTERVAL"
+            consume = true
+            ignore_missing = true
+        )
+
+		graph.interval_histogram(
+			interval = "CPU_TIME_F/TIME_INTERVAL"
+			title = "CPU time for filtered data"
+			filename = "CPU_TIME_F_AF.ps"
+			xaxis_label = "Time interval spent on CPU (us)"
+			yaxis_log = true
+			divisor = 1000
+			buckets = 30
+		)
+	]
+}

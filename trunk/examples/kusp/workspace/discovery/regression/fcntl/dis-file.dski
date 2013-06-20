@@ -1,0 +1,41 @@
+<dski>
+output_base = "/tmp/dis-file.dski.bin"
+child = "fileLock"
+
+<channels>
+chan1 = {
+	buffer_size = 500000,
+	buffer_count = 50
+}
+
+<datastreams>
+dski_dscvr = {
+	channel = chan1
+	filters = [
+		discover( 
+			ta_names = "file_locking",
+			enabled = [
+				 "FILELOCK/SETLKW"
+				]
+		)
+		task( 
+			tasks = "file_locking"
+		)
+	]
+	child_alias = "file_locking"
+	enabled = {
+	        FILELOCK = [
+                        FCNTL,
+                        DO_FCNTL,
+                        SETLKW,
+                        JUST_SETLK,
+                        FCNTL_SETLK,
+                        WRLCK,
+                        RDLCK,
+                        UNLCK
+                        ]
+		DSCVR = [
+			SETLKW
+			]
+	}
+}

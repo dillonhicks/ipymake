@@ -1,0 +1,186 @@
+#!/usr/bin/env python
+
+# dskitrace: a tool for collecting dski information about
+# a specific process.
+#
+# If you need something more general try dskid
+#
+# author: andrew boie
+
+from datastreams import dski
+import sys
+import os
+import optparse
+from pykusp import taskalias
+from netspec import protocol, daemon
+
+taskid = `os.getpid()`
+
+# default entities enabled and filter setup
+enabled = {
+#	"SCHED" : True,
+#	"SIGNAL_FAM" : True,
+#	"SYSCALL" : True,
+#	"TASKALIAS": True,
+#	"DSKITRACE": True
+	"FORK" : True,
+	"FILE" : True
+}
+filters = [
+	("task", { 
+		"tasks" : [
+			("trace-me-"+taskid, {"response" : "ACCEPT"})
+		],
+		"default_response" : "REJECT"		
+	})
+]
+
+
+# process command line options
+parser = optparse.OptionParser()
+parser.disable_interspersed_args()
+
+parser.set_defaults(
+	buffer_count = 50,
+	buffer_size = 500000,
+	skip_context = False,
+	output_base = "/tmp/dski_"+taskid,
+	add_fams = [],
+	add_ents = [],
+	verbose = False,
+	netspec_fd = None
+)
+
+parser.add_option("-n", "--netspec=", dest="netspec_fd", type="int",
+		help="netspec!")
+parser.add_option("-o", "--output-base", dest="output_base", type="string",
+		help="Base directory for DSKI output")
+parser.add_option("-s", "--buffer-size", dest="buffer_size", type="int",
+		help="Size of DSKI buffers")
+parser.add_option("-c", "--buffer-count", dest="buffer_count", type="int",
+		help="Number of DSKI buffers")
+parser.add_option("-x", "--skip-context", dest="skip_context",
+		action="store_true", help="Don't log context switches")
+parser.add_option("-f", "--add-family", dest="add_fams", type="string",
+		action="append", help="Additional DSKI families to log")
+parser.add_option("-e", "--add-entity", dest="add_ents", type="string",
+		action="append", help="Additional DSKI entities to log")
+parser.add_option("-v", "--verbose", dest="verbose",
+		action="store_true", help="Copious debug messages")
+
+(options, args) = parser.parse_args()
+
+
+def start_phase(cfg=None):
+	global context
+	global args
+
+	if options.netspec_fd:
+                if not cfg.has_key("args"):
+                        print "You must specify a program to trace"
+
+                for fam in cfg["extra-fams"]:
+                        enabled[fam] = True
+
+                args = cfg["args"].split()
+
+	else:
+		if not args:
+		        print "You must specify a command line."
+		        sys.exit(1)
+
+		if options.skip_context:
+		        enabled["SCHED"] = false
+
+		for fam in options.add_fams:
+		        enabled[fam] = True
+	
+	# setup DSKI
+	try:
+	        context = dski.dski_context(options.output_base)
+	except IOError:
+	        print "Unable to open DSKI device. Is the module loaded?"
+		sys.exit(1)
+	
+	context = dski.dski_context(options.output_base)
+
+	chan = context.create_channel("chan1", options.buffer_size,
+	        options.buffer_count, 0, False)
+	ds = context.create_datastream("ds1", "chan1")
+	
+	ds.process_enabled_dict(enabled)
+	ds.process_filter_list(filters)
+
+	if options.verbose:
+	        print "dskitrace: output is",options.output_base
+	        print "enabled families:"
+	        for k,v in enabled.items():
+	                if v == True:
+	                        print k, "(all)"
+	                else:
+	                        for e in v.keys():
+					print k+"/"+v
+
+	context.start_logging()
+
+	# spawn child process, giving it a name under taskalias
+	pid = os.fork()
+	if pid == 0:
+	        taskalias.add_alias_track("trace-me-"+taskid)
+	        taskalias.add_alias_track("dskitrace")
+	        try:	
+	                os.execvp(args[0], args)
+	        except OSError, e:
+			if options.netspec_fd:
+	                	daemon.ns_acknowledge(daemon.NS_ERROR)
+			print e
+	                sys.exit(e.errno)
+	        finally:
+	                sys.exit(1)
+	else:
+		try:
+			pid, ret = os.waitpid(pid, 0)
+
+			if options.verbose:
+	                        print "dskitrace: process exited with code",ret
+			if options.netspec_fd:
+				daemon.ns_acknowledge(daemon.NS_OK)
+
+		except KeyboardInterrupt:
+			print "dskitrace: Got keyboard interrupt"
+
+			if options.verbose:
+				print "dskitrace: terminated by keyboard interrupt"
+			if options.netspec_fd:
+				daemon.ns_acknowledge(daemon.NS_WARNING)
+
+
+def cleanup_phase(cfg=None):
+
+	if options.netspec_fd:
+		output_files = context.get_output_filenames()
+
+	print "CLOSING DSKI"
+	context.close()
+	print "CLOSE COMPLETE"
+
+	if options.netspec_fd:
+		for file in cfg["extra-files"]:
+			output_files.append(file)
+
+		daemon.ns_acknowledge(daemon.NS_OK_EXIT, filename=output_files)
+
+
+if options.netspec_fd:
+	print "Using NETSPEC"
+        daemon.ns_set_execute("begin", None, start_phase)
+        daemon.ns_set_execute("cleanup", None, cleanup_phase)
+	daemon.ns_begin(int(options.netspec_fd))
+
+
+
+start_phase()
+cleanup_phase()
+
+
+

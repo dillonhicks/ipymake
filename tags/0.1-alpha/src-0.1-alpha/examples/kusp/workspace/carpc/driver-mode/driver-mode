@@ -1,0 +1,126 @@
+#!/usr/bin/python
+
+from PyQt4 import QtGui as qt
+from PyQt4 import QtCore as qc
+from dmode import DriverMode
+from dmode.todo import Editor as TodoEditor
+from dmode.settings import Editor as SettingsEditor
+from dmode.config import Config, RemoteConfig, ConfigServer
+import optparse, sys, os, time, logging, xmlrpclib, struct
+
+if __name__ == '__main__':
+    
+    class Params_Set:
+        USAGE = "usage: %prog [options]"
+    
+        def __init__(self, args_list=None):
+            p = optparse.OptionParser(usage=self.USAGE)
+    
+            p.add_option("-d", action="store_const", const=1, default = 0,       
+                              dest="debug_level", 
+                              help="Turn on diagnostic output at level 1")
+            p.add_option("-D", action="store", type ="int", default = 0,   
+                              dest="debug_level", 
+                              help="Turn on diagnostic output at level DEBUG_LEVEL")
+            p.add_option("-t", "--todo", action = "store_true", 
+                              default = False, 
+                              help="Start todo list editor")
+            p.add_option("-c", "--config", action = "store_true", 
+                              default = False, 
+                              help="Start config editor")
+
+            p.add_option("-g", "--gps", action = "store_true",
+                         default = False,
+                         help = "Start gpsdrive")
+            
+            options, self.args = p.parse_args(args=args_list)
+
+            self.__dict__.update(vars(options))
+
+            # Output option details if debugging level is high enough
+            if self.debug_level >= 2 :
+                print self
+    
+        # Defining this method defines the string representation of the
+        # object when given as an argument to str() or the "print" command
+        #cd
+        def __str__(self):
+            ret = "Parameters:\n"
+
+            for k, v in vars(self).iteritems():
+                ret += "%15.15s: %s\n" %(k, str(v))
+            
+            return ret
+
+    class Application(qt.QApplication):
+        def __init__(self, *args):
+            qt.QApplication.__init__(self, *args)
+            
+            # QApplication may remove some arguments so use
+            # self.argv instead of sys.argv.
+            self.params = Params_Set(self.argv()[1:])
+            
+            self._local_config = Config()
+
+            self.remote_config = RemoteConfig('localhost', 4000)
+            
+        def serve_config(self):                                        
+            self.server = ConfigServer(self._local_config, 4000)
+            self.server.start()
+                    
+        def local_config(self):
+            return self._local_config
+                    
+        def config(self):
+            return self.remote_config
+
+    # qt.qApp doesn't get the python object correctly automatically
+    # so it gets manually set here
+    qt.qApp = app = Application(sys.argv)
+    
+    if app.params.todo:
+        app.setApplicationName("DriverMode.Todo")
+
+        widget = TodoEditor()
+
+        widget.show()      
+                
+        sys.exit(app.exec_())
+
+    elif app.params.config:
+        app.setApplicationName("DriverMode.Config")
+
+        widget = SettingsEditor()
+        widget.show()
+
+        sys.exit(app.exec_())
+    
+    elif app.params.gps:
+        # Mainly executed at startup time
+        os.system("gpsdrive -t -s --gui-mode=car &")
+
+        # Gpsdrive can take awhile to start.
+        # It doesn't work to move the window immediately.
+        # Additionally, this command cannot be placed in a child process
+        # without FATAL IO errors occuring from wmctrl
+        secs_to_wait = 20
+
+        # non-zero os.system return value == failure
+        # Always put gpsdrive on workspace 2. Worksapces are 0 numbered.
+        while os.system("wmctrl -r gpsdrive -t 1") and secs_to_wait > 0:
+            secs_to_wait -= 1
+            time.sleep(1)
+
+        sys.exit(0)
+    else:
+        app.setApplicationName("DriverMode")
+        app.setOrganizationName("tphagan")
+        app.setStyleSheet("QPushButton:focus { background-color: green; }")
+
+        app.serve_config()
+
+        widget = DriverMode()
+
+        widget.show()
+
+        sys.exit(app.exec_())

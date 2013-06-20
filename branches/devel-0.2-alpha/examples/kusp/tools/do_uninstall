@@ -1,0 +1,646 @@
+#!/bin/env python
+""" do_super_clean
+
+@author: Dillon Hicks
+@organization: KUSP
+@contact: kusp[at]googlegroups[dot]com
+@contact: hhicks[at]ittc[dot]ku[dot]edu
+
+@summary: Removes all of the known installed kusp files at a given 
+    prefix as the root. It will then look into the bin, lib, include, and 
+    share directories for the files that we know kusp installs.
+    
+    To run the program use:
+    
+        (sudo?) ./do_super_clean -p <prefix>
+    
+    If no prefix is given, then it will default to /usr. 
+    
+"""
+import sys
+
+# Site packages is dependent on your python version.
+# since we are using FC 10 and FC 11 which use 
+# Python 2.5 and Python 2.6 respectively, we can 
+# easily find the python version to insert into 
+# appropriate python module paths so that they are cleaned up.
+#
+MAJOR_VERSION, MINOR_VERSION = range(2)
+PYTHON_VERSION = '%d.%d' % \
+    (sys.version_info[MAJOR_VERSION], sys.version_info[MINOR_VERSION])
+DIRECTORY, FILE_LIST = range(2)
+
+# Holds all of the (dir, file_list) tuple pairs
+# where dir is the directory appended to prefix and
+# file_list is the list of files to be removed at
+# prefix/directory.
+#
+UNINSTALL_DATA = []
+
+################################################################################
+#
+#                        BIN DIRECTORY
+#
+################################################################################
+BIN_FILE_LIST = [
+                'calib',
+                'clksyncctl',
+                'daemonTrace',
+                'dskictrl',
+                'dskid',
+                'dski-parse',
+                'dskitrace',
+                'dsui-header',
+                'gschedctrl',
+                'metaparser',
+                'netspecd',
+                'nofilter',
+                'ns_control',
+                'postprocess',
+                'printconfig',
+                'smartgdb',
+                'start',
+                'stop',
+                'syscall_trace',
+                'systemMonitor',
+                'systemMonitorExit',
+                'testparser',
+                'traceme',
+                'trace-me'
+                ]
+# The bin directory path.
+#
+BIN_DIR = '/bin/'
+UNINSTALL_DATA.append((BIN_DIR, BIN_FILE_LIST))
+
+################################################################################
+#
+#                        INCLUDE DIRECTORY
+#
+################################################################################
+INCLUDE_FILE_LIST = [
+                    'ccsm.h',         
+                    'libdsui_dsui.h',
+                    'clksyncapi.h',   
+                    'linkedlist.h',
+                    'configfile.h',   
+                    'dsentity.h',    
+                    'dsheader.h',    
+                    'dski.h',        
+                    'dslist.h',       
+                    'dsnamespace.h',  
+                    'dsui.h',         
+                    'exception.h',    
+                    'hashtable.h',    
+                    'kusp_common.h',  
+                    ]
+INCLUDE_DIR = '/include/'
+UNINSTALL_DATA.append((INCLUDE_DIR, INCLUDE_FILE_LIST))
+
+################################################################################
+#
+#                        INCLUDE/LINUX DIRECTORY
+#
+################################################################################
+INCLUDE_LINUX_FILE_LIST =   [
+                            'misc.h',
+                            'mutex.h',
+                            'net.h',
+                            'netspec2.h',
+                            'rdwr.h',
+                            'sched_gsched.h',
+                            'taskalias.h',
+                            'taskmapper.h',
+                            'vector.h'
+                            ]
+INCLUDE_LINUX_DIR = '/include/linux/'
+UNINSTALL_DATA.append((INCLUDE_LINUX_DIR, INCLUDE_LINUX_FILE_LIST))
+
+################################################################################
+#
+#                        LIBRARY DIRECTORY
+#
+################################################################################
+LIBRARY_FILE_LIST = [
+                    'libccsm.so',
+                    'libclksync.so',
+                    'libdsui.a',
+                    'libdsui_shared.so',
+                    'libgsched.so',
+                    'libkusp.so',
+                    'libnetspec.so'
+                     ]
+LIBRARY_DIR = '/lib/'
+UNINSTALL_DATA.append((LIBRARY_DIR, LIBRARY_FILE_LIST))
+
+################################################################################
+#
+#                  PYTHON SITE PACKAGES DIRECTORY
+#
+################################################################################
+PY_SITE_PACKAGES_FILE_LIST =    [
+                                '_ccsm.so',
+                                'clksync-1.0-py%s.egg-info'%PYTHON_VERSION,
+                                'clksync_mod.so',
+                                'configfile_mod-1.0-py%s.egg-info'%PYTHON_VERSION,
+                                'configfile_mod.so',
+                                'datastreams-1.0-py%s.egg-info'%PYTHON_VERSION,
+                                'discovery-1.0-py%s.egg-info'%PYTHON_VERSION,
+                                'dski_mod.so',
+                                'dsui_mod.so',
+                                '_gsched.so',
+                                'netspec-2.0-py%s.egg-info'%PYTHON_VERSION,
+                                'pyccsm-1.0-py%s.egg-info'%PYTHON_VERSION,
+                                'pygsched-1.0-py%s.egg-info'%PYTHON_VERSION,
+                                'pykusp-0.1-py%s.egg-info'%PYTHON_VERSION
+                                ]
+PY_SITE_PACKAGES_DIR = '/lib/python%s/site-packages/' % PYTHON_VERSION
+UNINSTALL_DATA.append((PY_SITE_PACKAGES_DIR, PY_SITE_PACKAGES_FILE_LIST))
+
+################################################################################
+#
+#                  PYTHON CLKSYNC DIRECTORY
+#
+################################################################################
+PY_CLKSYNC_FILE_LIST = [
+                        'clksync.py',
+                        '__init__.py',
+                        'clksync.pyc',
+                        '__init__.pyc',
+                        ]
+PY_CLKSYNC_DIR = '/lib/python%s/site-packages/clksync/' % PYTHON_VERSION
+UNINSTALL_DATA.append((PY_CLKSYNC_DIR, PY_CLKSYNC_FILE_LIST))
+
+
+################################################################################
+#
+#                  PYTHON DATASTREAMS DIRECTORY
+#
+################################################################################
+PY_DATASTREAMS_FILE_LIST = [
+                            'dski.py',      
+                            '__init__.pyc',
+                            'dski.pyc',     
+                            'namespaces.py',
+                            'dsui.py',      
+                            'namespaces.pyc',
+                            'dsui.pyc',     
+                            '__init__.py',
+                            ]
+PY_DATASTREAMS_DIR = '/lib/python%s/site-packages/datastreams/' % PYTHON_VERSION
+UNINSTALL_DATA.append((PY_DATASTREAMS_DIR, PY_DATASTREAMS_FILE_LIST))
+
+
+################################################################################
+#
+#                  PYTHON POSTPROCESS DIRECTORY
+#
+################################################################################
+PY_POSTPROCESS_FILE_LIST = [
+                            'dcg.py',          
+                            'inputs.pyc',
+                            'dcg.pyc',         
+                            'ltt.py',
+                            'entities.py',     
+                            'ltt.pyc',
+                            'entities.pyc',    
+                            'outputs.py',
+                            'event_data.py',   
+                            'outputs.pyc',
+                            'event_data.pyc',  
+                            'pipeline.py',
+                            'filtering.py',    
+                            'pipeline.pyc',
+                            'filtering.pyc',   
+                            'ppexcept.py',
+                            'ppexcept.pyc',
+                            'headfilter.py',   
+                            'queues.py',
+                            'headfilter.pyc',  
+                            'queues.pyc',
+                            '__init__.py',     
+                            'syscall.py',
+                            '__init__.pyc',    
+                            'syscall.pyc',
+                            'inputs.py',
+                            ]
+PY_POSTPROCESS_DIR = '/lib/python%s/site-packages/datastreams/postprocess/' % PYTHON_VERSION
+UNINSTALL_DATA.append((PY_POSTPROCESS_DIR, PY_POSTPROCESS_FILE_LIST))
+
+################################################################################
+#
+#                  PYTHON POSTPROCESS FILTERS DIRECTORY
+#
+################################################################################
+PY_FILTERS_FILE_LIST = [
+                        'conversion.py',
+                        'conversion.pyc',
+                        'dcg.py',
+                        'dcg.pyc',
+                        'debug.py',
+                        'debug.pyc',
+                        'discovery_pre_process.py',
+                        'discovery_pre_process.pyc',
+                        'discovery.py',
+                        'discovery.pyc',
+                        'entities.py',
+                        'entities.pyc',
+                        'event_data.py',
+                        'event_data.pyc',
+                        'filtering.py',
+                        'filtering.pyc',
+                        'graph.py',
+                        'graph.pyc',
+                        'group_sched.py',
+                        'group_sched.pyc',
+                        'headfilter.py',
+                        'headfilter.pyc',
+                        'head.py',
+                        'head.pyc',
+                        '__init__.py',
+                        '__init__.pyc',
+                        'input_output.py',
+                        'input_output.pyc',
+                        'inputs.py',
+                        'inputs.pyc',
+                        'javaFilter.py',
+                        'javaFilter.pyc',
+                        'kernel.py',
+                        'kernel.pyc',
+                        'ltt.py',
+                        'ltt.pyc',
+                        'netwo.py',
+                        'netwo.pyc',
+                        'nx1.py',
+                        'nx1.pyc',
+                        'output.py',
+                        'output.pyc',
+                        'outputs.py',
+                        'outputs.pyc',
+                        'pipeline.py',
+                        'pipeline.pyc',
+                        'ppexcept.py',
+                        'ppexcept.pyc',
+                        'queues.py',
+                        'queues.pyc',
+                        'reduction.py',
+                        'reduction.pyc',
+                        'sanity.py',
+                        'sanity.pyc',
+                        'syscall.py',
+                        'syscall.pyc',
+                        'systemMonitor.py',
+                        'systemMonitor.pyc',
+                        'text_narration.py',
+                        'text_narration.pyc',
+                        'utility2.py',
+                        'utility2.pyc',
+                        'utility.py',
+                        'utility.pyc',
+                        ]
+PY_FILTERS_DIR = '/lib/python%s/site-packages/datastreams/postprocess/filters/' % PYTHON_VERSION
+UNINSTALL_DATA.append((PY_FILTERS_DIR, PY_FILTERS_FILE_LIST))
+
+################################################################################
+#
+#                  PYTHON DISCOVERY DIRECTORY
+#
+################################################################################
+PY_DISCOVERY_FILE_LIST =    [
+                            '__init__.py',
+                            '__init__.pyc',
+                            'kernel_constants.py',
+                            'kernel_constants.pyc',
+                            'oca_definitions.py',
+                            'oca_definitions.pyc',
+                            'syscall_numbers.py',
+                            'syscall_numbers.pyc',
+                            ]
+PY_DISCOVERY_DIR = '/lib/python%s/site-packages/discovery/' % PYTHON_VERSION
+UNINSTALL_DATA.append((PY_DISCOVERY_DIR, PY_DISCOVERY_FILE_LIST))
+
+################################################################################
+#
+#                  PYTHON NETSPEC DIRECTORY
+#
+################################################################################
+PY_NETSPEC_FILE_LIST = [
+                        'daemon.py',    
+                        '__init__.pyc',
+                        'daemon.pyc',   
+                        'protocol.py',
+                        '__init__.py',  
+                        'protocol.pyc',
+                        ]
+PY_NETSPEC_DIR = '/lib/python%s/site-packages/netspec/' % PYTHON_VERSION
+UNINSTALL_DATA.append((PY_NETSPEC_DIR, PY_NETSPEC_FILE_LIST))
+
+################################################################################
+#
+#                  PYTHON CLKSYNC DIRECTORY
+#
+################################################################################
+PY_CCSM_FILE_LIST = [
+                            'ccsmapi.py',   
+                            '__init__.py',
+                            'ccsmapi.pyc',  
+                            '__init__.pyc',
+                            ]
+PY_CCSM_DIR = '/lib/python%s/site-packages/pyccsm/' % PYTHON_VERSION
+UNINSTALL_DATA.append((PY_CCSM_DIR, PY_CCSM_FILE_LIST))
+
+################################################################################
+#
+#                  PYTHON GROUP SCHEDULING DIRECTORY
+#
+################################################################################
+PY_PYGSCHED_FILE_LIST   =   [
+                            'group_api.py',
+                            'group_api.pyc',
+                            'group_entities.py',
+                            'group_entities.pyc',
+                            'group_lib.py',
+                            'group_lib.pyc',
+                            'group_sched_state.py',
+                            'group_sched_state.pyc',
+                            'gschedapi.py',
+                            'gschedapi.pyc',
+                            'gsparsingtags.py',
+                            'gsparsingtags.pyc',
+                            'gssdf.py',
+                            'gssdf.pyc',
+                            'gssession.py',
+                            'gssession.pyc',
+                            'gsstructures.py',
+                            'gsstructures.pyc',
+                            '__init__.py',
+                            '__init__.pyc',
+                            ]
+PY_PYGSCHED_DIR = '/lib/python%s/site-packages/pygsched/' % PYTHON_VERSION
+UNINSTALL_DATA.append((PY_PYGSCHED_DIR, PY_PYGSCHED_FILE_LIST))
+
+################################################################################
+#
+#                  PYTHON KUSP DIRECTORY
+#
+################################################################################
+PY_PYKUSP_FILE_LIST =   [
+                        'configfile.py',
+                        'configfile.pyc',
+                        'configparser.py',
+                        'configparser.pyc',
+                        'configutility.py',
+                        'configutility.pyc',
+                        'datastore.py',
+                        'datastore.pyc',
+                        'docdict.py',
+                        'docdict.pyc',
+                        'doubledict.py',
+                        'doubledict.pyc',
+                        'filterwidgets.py',
+                        'filterwidgets.pyc',
+                        'framework.py',
+                        'framework.pyc',
+                        '__init__.py',
+                        '__init__.pyc',
+                        'lexerlib.py',
+                        'lexerlib.pyc',
+                        'lex.py',
+                        'lex.pyc',
+                        'location.py',
+                        'location.pyc',
+                        'namespaces.py',
+                        'namespaces.pyc',
+                        'parseexcept.py',
+                        'parseexcept.pyc',
+                        'pathfinder.py',
+                        'pathfinder.pyc',
+                        'remoteD.py',
+                        'remoteD.pyc',
+                        'setup_pykusp.py',
+                        'setup_pykusp.pyc',
+                        'taskalias.py',
+                        'taskalias.pyc',
+                        'yacc.py',
+                        'yacc.pyc',
+                         ]
+PY_PYKUSP_DIR = '/lib/python%s/site-packages/pykusp/' % PYTHON_VERSION
+UNINSTALL_DATA.append((PY_PYKUSP_DIR, PY_PYKUSP_FILE_LIST))
+
+################################################################################
+#
+#                  PYTHON CLKSYNC DIRECTORY
+#
+################################################################################
+PY_KUSP_PARSERS_FILE_LIST = [
+                            'configfile_parser.py',
+                            'configfile_parser.pyc',
+                            'group_sched_parser.py',
+                            'group_sched_parser.pyc',
+                            '__init__.py',
+                            '__init__.pyc',
+                            'ns_parser_v0.py',
+                            'ns_parser_v0.pyc',
+                            'ns_parser_v1.py',
+                            'ns_parser_v1.pyc',
+                            'parserlist.py',
+                            'parserlist.pyc',
+                            'parser_template.py',
+                            'parser_template.pyc',
+                            ]
+PY_KUSP_PARSERS_DIR = '/lib/python%s/site-packages/pykusp/parsers/' % PYTHON_VERSION
+UNINSTALL_DATA.append((PY_KUSP_PARSERS_DIR, PY_KUSP_PARSERS_FILE_LIST))
+
+################################################################################
+#
+#                       SHARE DIRECTORY
+#
+################################################################################
+SHARE_FILE_LIST =   [
+                    'cspec.cspec',
+                    'dskid.cspec',
+                    'dskid.gsc',
+                    'dskid.template',
+                    'dstream_admin.ns',
+                    'example.dski',
+                    'ns.cspec',
+                    'pidfilter.dski',
+                    'pipes.cspec',
+                    ]
+SHARE_DIR = '/share/'
+UNINSTALL_DATA.append((SHARE_DIR, SHARE_FILE_LIST))
+
+
+
+
+
+########################################################
+#
+# If this module is called as a command, then open the
+# file, parse it, and 
+
+if __name__ == "__main__":
+    # imports required if this module is called as a
+    # command
+    import optparse, sys, os
+    from pprint import *
+
+    # Define the set of permitted parameters, including the
+    # command arguments.  The initialization method creates
+    # the parser and defines the defaults. The parse()
+    # method actually parses the arguments one the command
+    # line. This was done so that the instance of the class
+    # could be global and thus available to all
+    # routines. and then parse the arguments to this call
+    # according to the specification
+    class Params_Set:
+        USAGE = "usage: %prog [options]"
+
+        def __init__(self):
+            # Create the argument parser and then tell it
+            # about the set of legal arguments for this
+            # command. The parse() method of this class
+            # calls parse_args of the optparse module
+            self.p = optparse.OptionParser(usage=self.USAGE)
+
+            # Boring and totally standard verbose and
+            # debugging options that should be common to
+            # virtually any command
+            #
+            self.p.add_option("-d", action="store_const", const=1,        
+                              dest="debug_level", 
+                              help="Turn on diagnostic output at level 1")
+            self.p.add_option("-D", action="store", type ="int",    
+                              dest="debug_level", 
+                              help="Turn on diagnostic output at level DEBUG_LEVEL")
+            self.p.add_option("-v", action="store_const", const=1,        
+                              dest="verbose_level", 
+                              help="Turn on narrative output at level 1")
+            self.p.add_option("-V", action="store", type ="int",    
+                              dest="verbose_level", 
+                              help="Turn on narrative output at level VERBOSE_LEVEL")
+            
+            # Command specific options. We can specify a
+            # configuration file to parse, which defaults to
+            # stdin, and an output file name, which defaults
+            # to stdout.
+            self.p.add_option("-p", "--prefix", action="store", type ="string", 
+                              dest="prefix", 
+                              help="Search and remove all kusp files (not directories) at PREFIX")
+
+
+        
+            # Now tell the parser about the default values of all the options
+            # we just told it about
+            self.p.set_defaults(
+                debug_level     = 0,          
+                verbose_level   = 0,
+                prefix          = '/usr'
+                )       
+            
+        def parse(self):
+            self.options, self.args = self.p.parse_args()
+            self.debug_level     = self.options.debug_level    
+            self.verbose_level   = self.options.verbose_level  
+            self.prefix          = self.options.prefix
+            
+            # Output option details if debugging level is high enough
+            if self.debug_level >= 3 :
+                print
+                print "Options: ", self.options
+                print "Args: ", self.args
+
+        # Defining this method defines the string representation of the
+        # object when given as an argument to str() or the "print" command
+        #cd
+        def __str__(self):
+            param_print_str = \
+"""Parameters:
+  debug_level    : %d
+  verbose_level  : %d
+  prefix         : %s
+""" 
+
+            str_output = param_print_str % \
+                (self.debug_level, 
+                 self.verbose_level,
+                 self.prefix)  
+            
+            return str_output
+        
+    def main():
+        # Global level params class instance was
+        # created before calling main(). We make it
+        # global so that other code can access the set
+        # of Parameters, simply by accessing the Params
+        # instance. Here, however, we call the parse()
+        # method to actually get the arguments, since
+        # we have been called from the command line.
+        Params.parse()
+        debug_level = Params.debug_level
+        if Params.debug_level >= 2:
+            print Params
+        
+        # This should always run.
+        #
+        if Params.prefix:
+            removed_files = []
+            if Params.verbose_level >= 1:
+                print 'Starting the remove process at PREFIX=%s' % Params.prefix
+            for i in range(0,len(UNINSTALL_DATA)):
+                # Iterate through every (dir, file_list) pair
+                #
+                # From the (dir, file_list) pair get the directory 
+                # and the file list and store them in separate
+                # variables for easier access.
+                data_tuple = UNINSTALL_DATA[i]
+                dir = data_tuple[DIRECTORY]
+                files = data_tuple[FILE_LIST]
+                # Path is the full path to the directory
+                # it uses the prefix root and appends the 
+                # current search directory dir.
+                #
+                path = Params.prefix + dir
+                if not os.path.exists(path):
+                    # The directory doesn't exist, so obviously
+                    # we cannot remove any files there, continue to the
+                    # next directory.
+                    #
+                    if Params.verbose_level >= 1:
+                        print 'Directory=%s does not exist, continuing to the next directory.' % dir
+                    continue
+                if Params.verbose_level >= 1:
+                    print 'Looking into DIRECTORY=%s' % dir
+                    print 'Files Removed:'
+                for fi in files:
+                    # Iterates through every file in the current search directories
+                    # file list.
+                    #
+                    if os.path.exists(path+fi):
+                        # If the file exsts, remove it.
+                        # and append it to the list of 
+                        # removed files.
+                        #
+                        if Params.verbose_level >= 1:
+                            print '-->%s' % fi
+                        removed_files.append(path+fi)
+                        os.remove(path+fi)
+                        
+                  
+            if Params.debug_level >=2:
+                # As debug information, reprint all of the  
+                # removed files as one big easily searchable list.
+                #
+                print '\nALL FILES REMOVED:\n'
+                pprint(removed_files)
+                        
+
+            
+        
+        
+        
+    
+    global Params
+    Params = Params_Set()
+
+    main()

@@ -1,0 +1,498 @@
+#!/usr/bin/python
+                                                                                                                                                             
+########################################################################
+# NAME:        dski-parse.py
+# AUTHOR:      Michael Frisbie
+#	       Hariharan Subramanian
+#              Deepti Mokkapati
+#	       Karthikeyan Varadarajan
+# DESCRIPTION: Parses DSUI family definition files and generates header
+#              files and a kernel family configuration file.
+#
+################################################################
+
+import sys
+import string
+import pickle
+import getopt
+
+
+# FIXME: this program is horrible and needs to be re-written
+
+from pykusp.namespaces import *
+from datastreams import namespaces
+
+usage = """USAGE:  dski-parse.py -- Generates DSKI header files
+
+The files families.dski, events.dski, counters.dski, and histograms.dski
+are parsed and the header files datastream_families.h,
+datastream_table_kernel.h, and datastream_table_user.h are generated.
+"""
+
+genEventMacro = """
+#ifdef CONFIG_DSTREAM_%s
+#define DSTRM_EVENT_%s( event,set, len, data ) { \\
+	if(dstream_family_table[%s_NUM])\\
+	    if( DS_ENTITY_ISSET(dstream_family_table[%s_NUM]->ev_flags, event ) ) \\
+	            log_event( %s_NUM, event, set, len, data, NULL ); \\
+}
+#else
+#define DSTRM_EVENT_%s( event, set, len, data )
+#endif
+"""
+
+genCounterMacro = """
+#ifdef CONFIG_DSTREAM_%s
+#define DSTRM_ADD_TO_COUNTER_%s( cntr_cat, howmuch ) { \\
+    if (dstream_family_table[%s_NUM]) \\
+      if (DS_ENTITY_ISSET(dstream_family_table[%s_NUM]->cntr_flags, cntr_cat)) \\
+         incr_count(%s_NUM, cntr_cat, howmuch); \\
+}
+#else
+#define DSTRM_ADD_TO_COUNTER_%s( cntr_cat, howmuch )
+#endif
+"""
+                                                                                                                                                             
+genHistogramMacro = """
+#ifdef CONFIG_DSTREAM_%s
+#define DSTRM_HISTOGRAM_%s( hist_cat, howmuch ) { \\
+    if( dstream_family_table[%s_NUM] ){ \\
+        if( DS_ENTITY_ISSET(dstream_family_table[%s_NUM]->hist_flags, hist_cat) ) \\
+            log_histogram( %s_NUM, hist_cat, howmuch, howmuch ); \\
+    } \\
+}
+
+#define DSTRM_HIST_ENTER_%s(hist_cat) { \\
+   if (dstream_family_table[%s_NUM]) { \\
+     if (DS_ENTITY_ISSET(dstream_family_table[%s_NUM]->hist_flags, hist_cat)) { \\
+     	 hist_enter(%s_NUM, hist_cat, 0); \\
+     } \\
+   } \\
+}
+
+#define DSTRM_HIST_EXIT_%s(hist_cat) { \\
+   if (dstream_family_table[%s_NUM]) { \\
+     if (DS_ENTITY_ISSET(dstream_family_table[%s_NUM]->hist_flags, hist_cat)) { \\
+     	 hist_exit(%s_NUM, hist_cat, 0); \\
+     } \\
+   } \\
+}
+
+
+#define DSTRM_HIST_TO_GROUP_ENTER_%s(hist_cat, group) { \\
+   if (dstream_family_table[%s_NUM]) { \\
+     if (DS_ENTITY_ISSET(dstream_family_table[%s_NUM]->hist_flags, hist_cat)) { \\
+        hist_enter(%s_NUM, hist_cat, group);  \\
+     } \\
+   } \\
+}
+
+#define DSTRM_HIST_TO_GROUP_EXIT_%s(hist_cat, group) { \\
+   if (dstream_family_table[%s_NUM]) { \\
+     if (DS_ENTITY_ISSET(dstream_family_table[%s_NUM]->hist_flags, hist_cat)) { \\
+     	hist_exit(%s_NUM, hist_cat, group);  \\
+     } \\
+   } \\
+}
+
+#define DSTRM_HIST_TO_GROUP_EXIT_CYCLES_%s(hist_cat, group) { \\
+   if (dstream_family_table[%s_NUM]) { \\
+     if (DS_ENTITY_ISSET(dstream_family_table[%s_NUM]->hist_flags, hist_cat)) { \\
+         log_histogram(%s_NUM, hist_cat, \\
+                        (long)(get_cycles() - *enter_value_group(dstream_family_table[%s_NUM], hist_cat, group)),\\
+                        group); \\
+     } \\
+
+#define DSTRM_HISTOGRAM_TO_GROUP_%s(hist_cat, howmuch, group) { \\
+   if (dstream_family_table[%s_NUM]) { \\
+     if (DS_ENTITY_ISSET(dstream_family_table[%s_NUM]->hist_flags, hist_cat)) \\
+       log_histogram(%s_NUM, hist_cat, howmuch, group); \\
+   } \\
+}
+
+#else
+#define DSTRM_HISTOGRAM_%s( hist_cat, howmuch )
+#define DSTRM_HIST_ENTER_%s( hist_cat )
+#define DSTRM_HIST_TO_GROUP_ENTER_%s(hist_cat, group)
+#define DSTRM_HIST_TO_GROUP_EXIT_%s(hist_cat, group)
+#define DSTRM_HIST_TO_GROUP_EXIT_CYCLES_%s(hist_cat, group)
+#define DSTRM_HISTOGRAM_TO_GROUP_%s(hist_cat, howmuch, group)
+#endif
+"""
+
+
+# These are here so if you change the substitution strings above, you
+# don't have to go all the way down to the code to make sure the
+# correct amount of substitutions are made.  They are set
+# automatically with the first being *_FAM, and all the rest just *
+# (where * is the name of the family).  Each is set to the number
+# of "%s"s in the corresponding string.
+#
+NUM_EVENT_SUBS = string.count( genEventMacro, '%s' )
+NUM_COUNTER_SUBS = string.count( genCounterMacro, '%s' )
+NUM_HISTOGRAM_SUBS = string.count( genHistogramMacro, '%s' )
+
+
+DSTRM_EVENT = 'event'
+DSTRM_OBJECT= 'object'
+DSTRM_HISTOGRAM = 'histogram'
+DSTRM_COUNTER = 'counter'
+DSTRM_INTERVAL = 'interval'
+DSTRM_TYPES = [ DSTRM_EVENT, DSTRM_OBJECT, DSTRM_HISTOGRAM, DSTRM_COUNTER, DSTRM_INTERVAL ]
+
+#
+# All globals were removed. You can add them here if you need any
+#
+
+#Generate header files
+# This routine generates the three header files
+def generateHeaders(families, nsbin):
+    num_families=len(families)
+    result = 0
+    try:
+
+        kernelTable = open('datastream_table_kernel.h', 'w')
+	kernelTableSource = open('datastream_table_kernel.c', 'w')
+        familyFile = open('datastream_families.h', 'w')
+
+        familyFile.write('#ifndef _DSKI_FAMILIES_H\n'+
+                         '#define _DSKI_FAMILIES_H\n\n');
+        #familyFile.write('#include <linux/datastreams/datastream_defines.h>\n\n')
+	kernelTableSource.write('#include <linux/datastreams/datastream_common.h>\n')
+	kernelTableSource.write('#include <linux/datastreams/datastream_core.h>\n')
+	kernelTableSource.write('#include <linux/datastreams/datastream_table_kernel.h>\n')
+	kernelTableSource.write('#include <linux/module.h>\n');
+        kernelTable.write('#ifndef _DSKI_TABLE_H\n'+
+			  '#define _DSKI_TABLE_H\n\n');
+	#kernelTable.write('#include "datastream_objects.h"\n\n')
+        familyFile.write('#define NUM_FAMILIES ' + repr(num_families) + '\n\n')
+
+
+	for fam in families.keys():
+            familyFile.write('/* DSKI Family: ' + fam + '\n' +
+                             ' * ' + families[fam]['description'] + '\n */\n')
+            familyFile.write('#define ' + fam + '_NUM ' + repr(families[fam]['number']) + '\n')
+
+	    i = 0
+	    length = len(families[fam][DSTRM_EVENT])
+	    while i<len(families[fam][DSTRM_EVENT]):
+		if families[fam][DSTRM_EVENT][i] == None:
+			length = length - 1
+		i = i + 1
+
+	    # EXPLAIN Why is length always reported one number bigger?
+	    familyFile.write('#define NUM_EVENTS_' + fam + ' ' + repr(length) + '\n')
+
+
+	    i = 0
+	    length = len(families[fam][DSTRM_INTERVAL])
+	    while i<len(families[fam][DSTRM_INTERVAL]):
+		if families[fam][DSTRM_INTERVAL][i] == None:
+			length = length - 1
+		i = i + 1
+
+	    familyFile.write('#define NUM_INTERVALS_' + fam + ' ' + repr(length) + '\n')
+
+
+	    i = 0
+	    length = len(families[fam][DSTRM_COUNTER])
+
+	    while i<len(families[fam][DSTRM_COUNTER]):
+		if families[fam][DSTRM_COUNTER][i] == None:
+			length = length - 1
+		i = i + 1
+
+            familyFile.write('#define NUM_COUNTERS_' + fam + ' ' + repr(length) + '\n')
+
+
+	    i = 0
+	    length = len(families[fam][DSTRM_OBJECT])
+
+	    while i<len(families[fam][DSTRM_OBJECT]):
+		if families[fam][DSTRM_OBJECT][i] == None:
+			length = length - 1
+		i = i + 1
+
+	    familyFile.write('#define NUM_OBJECTS_' + fam + ' ' + repr(length) + '\n')
+
+
+	    i = 0
+	    length = len(families[fam][DSTRM_HISTOGRAM])
+
+	    while i<len(families[fam][DSTRM_HISTOGRAM]):
+		if families[fam][DSTRM_HISTOGRAM][i] == None:
+			length = length - 1
+		i = i + 1
+
+	    familyFile.write('#define NUM_HISTOGRAMS_' + fam + ' ' + repr(length) + '\n')
+
+
+            kernelTableSource.write('struct ds_active_event ' + fam)
+            kernelTableSource.write('_EVENTS[] = {\n')
+            i = 0
+            for event in families[fam][DSTRM_EVENT]:
+                if event == None:
+                    kernelTableSource.write('{0,NULL},\n')
+                else:
+                    kernelTableSource.write('{0,NULL}')
+                    familyFile.write('#define ' + event[0] + ' ' + repr(i) + '\n')
+                    if i < len(families[fam][DSTRM_EVENT])-1:
+                               kernelTableSource.write(',')
+                    kernelTableSource.write('\n')
+                i = i + 1
+            kernelTableSource.write('};\n')
+            familyFile.write('\n')
+
+
+            kernelTableSource.write('struct ds_active_counter ' + fam)
+	    kernelTableSource.write('_COUNTERS[] = {\n')
+            i = 0
+            for counter in families[fam][DSTRM_COUNTER]:
+                if counter == None:
+                    kernelTableSource.write('{0,0,0,0},\n')
+                else:
+                    kernelTableSource.write('{0,0,0,0}')
+                    familyFile.write('#define ' + counter[0] + ' ' + repr(i) + '\n')
+                    if i < len(families[fam][DSTRM_COUNTER])-1:
+                               kernelTableSource.write(',')
+                    kernelTableSource.write('\n')
+                i = i + 1
+            kernelTableSource.write('};\n')
+            familyFile.write('\n')
+
+
+            kernelTableSource.write('struct ds_active_object ' + fam)
+            kernelTableSource.write('_OBJECTS[] = {\n')
+            i = 0
+            for object in families[fam][DSTRM_OBJECT]:
+                if object == None:
+                    kernelTableSource.write('{NULL},\n')
+                else:
+                    kernelTableSource.write('{'+ object[3]+ '}')
+                    familyFile.write('#define ' + object[0] + ' ' + repr(i) + '\n')
+                    if i < len(families[fam][DSTRM_OBJECT])-1:
+                               kernelTableSource.write(',')
+                    kernelTableSource.write('\n')
+                i = i + 1
+            kernelTableSource.write('};\n')
+            familyFile.write('\n')
+
+
+            kernelTableSource.write('struct ds_active_histogram ' + fam)
+            kernelTableSource.write('_HISTOGRAMS[] = {\n')
+            i = 0
+            for histogram in families[fam][DSTRM_HISTOGRAM]:
+                if histogram == None:
+                    kernelTableSource.write('{0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, NULL, NULL, NULL},\n')
+                else:
+                    kernelTableSource.write('{0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, NULL, NULL, NULL}')
+                    familyFile.write('#define ' + histogram[0] + ' ' + repr(i) + '\n')
+                    if i < len(families[fam][DSTRM_HISTOGRAM])-1:
+                               kernelTableSource.write(',')
+                    kernelTableSource.write('\n')
+                i = i + 1
+            kernelTableSource.write('};\n')
+            familyFile.write('\n')
+
+
+            i = 0
+            for interval in families[fam][DSTRM_INTERVAL]:
+                if interval == None:
+                    pass
+                else:
+                    familyFile.write('#define ' + interval[0] + ' ' + repr(i) + '\n')
+                i = i + 1
+            familyFile.write('\n')
+
+
+ 	    kernelTableSource.write('struct dstream_family ' + fam + ' = {\n' +
+                              '#ifdef CONFIG_GROUP_SCHED_IRQ\n'+
+                              '\tSPIN_LOCK_UNLOCKED_IRQ(TIMER_IRQ),\n' +
+                              '#else\n'+
+                              '\t.lock = RAW_SPIN_LOCK_UNLOCKED(lock),\n' +
+                              '#endif\n\t'+
+                              fam + '_NUM,\n' +
+                              '\t0,\n\t0,\n\t0,\n\t0,\n\t0,' +
+                              '\tNUM_EVENTS_' + fam + ',\n' +
+                              '\tNUM_COUNTERS_' + fam + ',\n' +
+                              '\tNUM_OBJECTS_' + fam + ',\n' +
+                              '\tNUM_HISTOGRAMS_' + fam + ',\n\t0,\n' +
+                              fam + '_EVENTS,\n\t' +
+                              fam + '_COUNTERS,\n\t' +
+                              fam + '_OBJECTS,\n\t' +
+                              fam + '_HISTOGRAMS,\n\t' +
+                              'NULL\n};\n\n')
+
+
+	kernelTableSource.write('char dstream_ns_binary[] =\n\t"')
+	counter = 1;
+	for byte in nsbin:
+		if counter == 0:
+			kernelTableSource.write('"\n\t"')
+		kernelTableSource.write("\\x"+byte.encode('hex_codec'))
+		counter = counter + 1
+		if counter == 16:
+			counter = 0
+	kernelTableSource.write('";\nEXPORT_SYMBOL(dstream_ns_binary);\n');
+	kernelTableSource.write('const unsigned long dstream_ns_size = '+`len(nsbin)`+';\n')
+	kernelTableSource.write('EXPORT_SYMBOL(dstream_ns_size);\n');
+
+	familyFile.write("extern char dstream_ns_binary[];\n")
+	familyFile.write("extern const unsigned long dstream_ns_size;\n") 
+	
+
+        kernelTableSource.write('struct dstream_family *dstream_family_table[NUM_FAMILIES] = {')
+
+        # It is necessary to put the families in order so that
+        # they are inserted into the table correctly
+        famList = []
+        for fam in families.keys():
+            while len(famList) <= families[fam]['number']:
+                famList.append('\n\tNULL,')
+            if families[fam]['number'] != num_families-1:
+                famList[families[fam]['number']] = '\n\t&' + fam + ',' 
+            else:
+                famList[families[fam]['number']] = '\n\t&' + fam
+
+
+        for eachLine in famList:
+            kernelTableSource.write(eachLine)
+        kernelTableSource.write('\n};EXPORT_SYMBOL(dstream_family_table);\n')
+	
+        # Write family specific macros
+	for name in families.keys():
+            name_fam = name
+            events_flag=0
+            counters_flag=0
+            histograms_flag=0
+
+            #if families[name][event]!=None:
+            for event in families[name][DSTRM_EVENT]:
+                if events_flag == 0:
+                        if event!= None:
+                                sub_tuple = tuple( [name] + list((NUM_EVENT_SUBS - 1) * (name_fam,)) )
+                                familyFile.write( genEventMacro % (sub_tuple) )
+                                events_flag=1
+                                                                                                                                                             
+                                                                                                                                                             
+            for counter in families[name][DSTRM_COUNTER]:
+                if counters_flag==0:
+                        if counter!= None:
+                                                                                                                                                             
+                                sub_tuple = tuple( [name] + list((NUM_COUNTER_SUBS - 1) * (name_fam,)) )
+                                familyFile.write( genCounterMacro % sub_tuple )
+                                counters_flag=1
+                                                                                                                                                             
+            for histogram in families[name][DSTRM_HISTOGRAM]:
+                if histograms_flag == 0:
+                        if histogram!= None:
+                                                                                                                                                             
+                                sub_tuple = tuple( [name] + list((NUM_HISTOGRAM_SUBS - 1) * (name_fam,)) )
+                                familyFile.write( genHistogramMacro % sub_tuple )
+                                histograms_flag=1
+
+     
+        familyFile.write('#endif /* _DSKI_FAMILIES_H */\n')
+	kernelTable.write('#endif /* _DSKI_TABLE_H */\n')
+
+        kernelTable.close()
+	kernelTableSource.close()
+        familyFile.close()
+
+    except IOError, error:
+        result = error
+
+    return result
+
+
+
+# This routine generates the kernel configuration file
+def generateKernelConfig(families):
+    result = 0
+    try:
+        kernelConfig = open('family-config.in', 'w')
+        kernelConfig.write('# DSKI Family Kernel Configuration\n')
+        kernelConfig.write("menu \"DSKI Family Configuration\"\n\n")
+
+        familyList = families.keys()
+        familyList.sort()
+
+        for fam in familyList:
+            kernelConfig.write("config  DSTREAM_%s\n" % (fam))
+            kernelConfig.write("\tdepends on DSTREAM\n")
+            kernelConfig.write("\tbool \"%s\"\n\n" % (families[fam]['description']))
+
+        kernelConfig.write("endmenu\n")
+        kernelConfig.close()
+
+    except IOError, error:
+        result = error
+
+    return result
+
+
+
+def print_usage():
+	print "Usage:./dstrm-parse.py -n <namespace_defs>\n"
+
+
+
+
+
+################
+# Main Program #
+################
+def main():
+
+	#
+	# initiate an empty list for namespace files
+	#
+	list_of_files=[]
+	options,args =getopt.getopt(sys.argv[1:], 'n:')
+	for each_option in options:
+		if each_option[0]=='-n':
+			list_of_files.append(each_option[1])
+		else:
+			print_usage()
+	#
+	# Obtain the namespace dictionary for the
+	# specification file we care about
+	#
+
+	list_of_files.insert(0, namespaces.admin_filename);
+
+	ns3 = namespaces.read_namespace_files(list_of_files);
+
+	families = convert_to_old_datastructure(
+            convert_to_v1_datastructure(ns3))
+
+	
+	nsbin = ns3.serialize()
+
+
+	#	
+	# Generate the kernel header files
+	#
+       	if len(families) != 0:
+               	exitval = generateHeaders(families['name'], nsbin)
+
+	if exitval == 0:
+	    print "DSKI header files generated successfully."
+	else:
+	    print "DSKI header file generation failed."
+	    print usage
+	#
+	# Generate the DSKI kernel configuration options file
+	#
+	if exitval == 0:
+        	exitval = generateKernelConfig(families['name'])
+
+	if exitval==0:
+	    print "DSKI kernel configuration file generation successful."
+	else:
+	    print "DSKI kernel configuration file generation failed."
+
+#
+# Call main function
+#
+main()

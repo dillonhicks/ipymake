@@ -1,0 +1,67 @@
+<FUNC_COSINE>
+desc = "main function stuff"
+events = {
+        ENTER = {
+                desc = "entered cosine function"
+                extra_data = "print_double"
+        }
+        EXIT = {
+                desc = "left cosine function"
+        }
+}
+
+
+<FUNC_DISPLAY>
+desc = "main function stuff"
+events = {
+        EXIT = {
+                desc = "leaving display function"
+        }
+        ENTER = {
+                desc = "enter display function"
+                extra_data = "print_string"
+        }
+}
+
+<FUNC_LOOP>
+desc = "useless loop function"
+events = {
+        ENTER = {
+                desc = "entering useless loop function"
+                extra_data = "print_int"
+        }
+        EXIT = {
+                desc = "exiting useless loop function"
+        }
+        ITER_ONE = {
+                desc = "in loop iteration"
+        }
+        ITER_TWO = {
+                desc = "in loop iteration"
+        }
+}
+histograms = {
+        DSUI_OVERHEAD_HIST = {
+                desc = "time between DSUI events"
+                units = ""
+        }
+}
+
+<FUNC_MAIN>
+desc = "main function stuff"
+events = {
+        IN_MAIN_FUNC = {
+                desc = "now inside main function"
+        }
+        CALLING_FUNC_DISPLAY = {
+                desc = "calling display function"
+        }
+        CALLING_FUNC_COSINE = {
+                desc = "calling cosine function"
+        }
+        CALLING_FUNC_LOOP = {
+                desc = "calling useless loop function"
+        }
+}
+
+

@@ -1,0 +1,204 @@
+<main>
+filter_modules = [ "cs_filter.py", "gap_filter.py" ]
+filters = {
+	dski1 = [
+		head.input(
+			file = ["./tmp/sigpipe_gsched_ccsm.dski.bin/chan1/cpu*.bin"]
+		)
+
+		utility.timestamp()
+
+		sort.sort_time()
+
+		gschedfilter.GSFilter(
+			outfile = "gs.txt"
+			consume = false
+		)
+
+		gschedfilter.BuildGSHFilter(
+			outfile = "gs.png"
+			consume = true
+		)
+
+	]
+
+	dsui = [
+		head.input(
+			file = ["./tmp/sigpipe_gsched_ccsm.dsui.bin"]
+                        namespace = {
+                                GAP_INTERVALS = {
+                                        entities = {
+                                                GAP_ONE = interval(
+                                                        desc = "gap one intervals"
+                                                )
+                                                ALL_GAPS = interval(
+                                                        desc = "all gaps intervals"
+                                                )
+                                        }
+                                }
+                                GAP_HISTOS = {
+                                        entities = {
+                                                GAP_ONE_HISTO = histogram(
+                                                        desc = "gap one histogram"
+                                                        units = "ns"
+                                                )
+                                                ALL_GAPS_HISTO = histogram(
+                                                        desc = "all gaps histogram"
+                                                        units = "ns"
+                                                )
+                                        }
+								}
+                                PIPE_INTERVAL = {
+								entities = {
+                                                PIPE = interval(
+                                                        desc = "time for a signal to clear the whole pipeline"
+                                                )
+                                        }
+                                }
+                                PIPE_HISTO = {
+                                        entities = {
+                                                PIPE_HISTO = histogram(
+                                                        desc = "pipe traversal histogram"
+                                                        units = "us"
+                                                )
+                                        }
+                                }
+                        }
+
+		)
+
+		utility.timestamp()
+
+		sort.sort_time()
+	]
+
+	# The second pipeline we define is called "custom". Note that it also must implement a "head" filter.
+        # Instead of indicating a file, we instead use the "conn" key word to connect the head of this pipeline
+	# to the tail of the "dsui" pipeline. Any events which reach the end of the "dsui" pipeline will now
+        # enter the beginning of the "custom" pipeline, where they will then feed into our custom filter. Note
+        # that if we wished, we could also define more namespace entities at this stage in the pipeline, which
+        # would then be availabe to any filters in this pipeline and also any filters in pipelines which follow.
+        # For a better understanding of the use of the custom filter, please see the comments in the code
+        # of sigpipe_filter.py.
+
+        custom = [
+                head.input(
+                        conn = [dsui]
+                )
+
+                gap_filter.pipeline_intervals(
+                        gap_one_interval = "GAP_INTERVALS/GAP_ONE"
+                        all_gaps_intervals = "GAP_INTERVALS/ALL_GAPS"
+                        pipeline_interval = "PIPE_INTERVAL/PIPE"
+                        consume = true
+                )
+        ]
+
+        # The third pipeline we define is called "create_histograms", which is exactly what it does, making
+        # use of the existing conversion filter library to generate histograms from our synthetic intervals.
+        # It may not be clear, but the intervals themselves were constructed inside our custom filter
+        # above. Note that we again begin with the "head" filter, which we simply connect to the "custom"
+        # pipeline, so that all output from the "custom" pipeline enters the head of this pipeline.
+
+        create_histograms = [
+                head.input(
+                        conn = [custom]
+                )
+
+                conversion.interval_to_histogram(
+                        interval = "GAP_INTERVALS/GAP_ONE"
+                        histogram = "GAP_HISTOS/GAP_ONE_HISTO"
+                        buckets = 25
+                )
+
+                conversion.interval_to_histogram(
+                        interval = "GAP_INTERVALS/ALL_GAPS"
+                        histogram = "GAP_HISTOS/ALL_GAPS_HISTO"
+                        buckets = 25
+                )
+
+                conversion.interval_to_histogram(
+                        interval = "PIPE_INTERVAL/PIPE"
+                        histogram = "PIPE_HISTO/PIPE_HISTO"
+                        buckets = 50
+                )
+        ]
+
+        # The fourth and final pipeline we define is called "create_graphs", and again, that is exactly
+        # what it does. Three graphical representations of our generated histograms are created and
+        # written to the directory containing this pipeline configuration file. The first, title "gap
+        # one histogram" is a histogram of the time elapsed between the first element in the pipeline
+        # sending a signal, and the second element in the pipeline receiving the same signal. The second
+        # histogram is similar, but covers the gaps between all elements in the pipeline. The third
+        # histogram is for the overall duration of sending a signal into the beginning of the pipeline
+        # to its receipt at the end.
+
+        create_graphs = [
+                head.input(
+                        conn = [create_histograms]
+                )
+
+                graph.histogram(
+                        histogram = "GAP_HISTOS/GAP_ONE_HISTO"
+                        title = "gap one histogram"
+                )
+
+                graph.histogram(
+                        histogram = "GAP_HISTOS/ALL_GAPS_HISTO"
+                        title = "all gaps histogram"
+                )
+
+                graph.histogram(
+                        histogram = "PIPE_HISTO/PIPE_HISTO"
+                        title = "total pipeline traversal time"
+			divisor = 1000
+                )
+
+        ]
+
+
+	dski2 = [
+		head.input(
+			file = ["./tmp/sigpipe_gsched_ccsm.dski.bin/chan2/cpu*.bin"]
+			namespace = {
+				CPU_TIME = {
+					entities = {
+						TIME_INTERVAL = interval(
+							desc = "cpu time intervals"
+						)
+					}
+				}
+			}
+		)
+
+		utility.timestamp()
+		
+		sort.sort_time()
+	]
+
+	f2 = [
+		head.input(
+			conn = [dski2]
+		)
+
+		cs_filter.cpu_time(
+			emit_interval = "CPU_TIME/TIME_INTERVAL"
+			consume = true
+		)
+
+		graph.interval_histogram_tagged(
+			interval = "CPU_TIME/TIME_INTERVAL"
+			title = "CPU TIME"
+			filename = "CPU_TIME-"
+			xaxis_label = "Time interval spent on CPU (us)"
+			yaxis_log = true
+			divisor = 1000
+			buckets = 30
+		)
+	]
+}
+
+
+
+
+

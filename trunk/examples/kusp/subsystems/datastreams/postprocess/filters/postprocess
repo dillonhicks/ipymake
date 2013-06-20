@@ -1,0 +1,192 @@
+#!/usr/bin/env python
+try:
+	import psyco
+	psyco.full()
+	#print "Psyco loaded."
+	pass
+except ImportError:
+	#print "Psyco not detected."
+	pass
+
+from datastreams.postprocess import pipeline
+from datastreams.postprocess.ppexcept import *
+from pykusp import configfile
+from location import kusproot
+from datastreams.postprocess import filtering
+import sys
+import getopt
+
+usage = """Postprocess 2.2
+usage: postprocess <command> <parameters>
+available commands:
+
+   h | help
+   	Print this message and exit
+
+   f | filter <options> <filename> 
+	Do filtering using specified config file
+	Available filtering options:
+   	-t | --tee-output
+	  	Write all pipeline outputs to intermediate files
+		and use tee output files to resume processing
+	-x | --extra-data <filename>
+		Specify python file with local
+		extra data decoding functions
+	-m | --local-module <filename>
+		Specify python file with local
+		filter classes
+	-d | --debug
+		Print copious debugging information
+
+   n | narrate <options> <filename>
+   	Run a narration filter on a file, to quickly view its
+	contents.
+	Available options:
+	-o | --output <filename>
+		Text output file to write narration data. By default,
+		data is sent to stdout.
+	-e | --extra-data
+		Print extra data associated with events, if any
+	-d | --no-description
+		Do not print entity descriptions
+	-l | --lines <microseconds>
+		Print a dashed line every n microseconds
+	-v | --divisor <number>
+		Divide all timestamps by this number
+	-s | --nosort
+		Don't sort the data
+	-i | --ignore-time
+		Disregard timekeeping info and only use TSC
+
+
+   fh | filterhelp <module or filter names>
+   	Show list of filters available in a module, or
+   	Show help information for a particular filter
+"""
+
+
+pipeline.Watcher()
+
+
+def runfilter(args):
+	opts, files = getopt.gnu_getopt(args,
+		"tx:m:d", ["tee-output", "extra-data", "debug"
+		"local-module"])
+	
+	if len(files) != 1:
+		print "Please specify one pipeline configuration file"
+		sys.exit(1)
+
+	filename = files[0]
+
+	try:
+		cfg =  configfile.parse_config(filename,
+			kusproot+"/share/datastreams/pipes.cspec")
+	except Exception, ex:
+		print "Error in parsing file "+filename
+		print ex
+		sys.exit(1)
+
+	for tree, graph in cfg.iteritems():
+		
+		for opt, arg in opts:
+			if opt in ["-t","--tee-output"]:
+				graph["tee_output"] = True
+			elif opt in ["-x","--extra-data"]:
+				graph["local_extra_data"].append(arg)
+			elif opt in ["-m","--local-module"]:
+				graph["local_filter_modules"].append(arg)
+			elif opt in ["-d","--debug"]:
+				graph["debug"] = True
+	
+		n = pipeline.ProcessingNode(tree, graph["tee_output"],
+				graph["filter_modules"], graph["filters"], graph["debug"])
+
+		n.run()	
+	
+	print "Postprocessing complete."
+
+def narrate(args):
+	opts, files = getopt.gnu_getopt(args,
+			"o:edl:v:si", ["output","extra-data","nosort",
+				"no-description", "lines","divisor","ignore-time"])
+
+	params = {
+			"divisor" : 1000000		
+	}
+	sortdata = True
+
+	for opt, arg in opts:
+		if opt in ["-o","--output"]:
+			params["output"] = arg
+		elif opt in ["-e", "--extra-data"]:
+			params["print_extra_data"] = True
+		elif opt in ["-d", "--no-description"]:
+			params["print_description"] = False
+		elif opt in ["-l", "--lines"]:
+			params["line_every_n_us"] = int(arg)
+		elif opt in ["-v", "--divisor"]:
+			params["divisor"] = int(arg)
+		elif opt in ["-s", "--nosort"]:
+			sortdata = False
+		elif opt in ["-i", "--ignore-time"]:
+			params["ignore_time"] = True
+
+	if not files:
+		print usage
+		exit(1)
+
+
+	cfg1 = {
+		"f" : [
+			("head.input", {"file":files, "convert_timestamps":True}),
+			("utility.sort", {}),
+			("utility.narrate", params)
+		]
+	}
+		
+	cfg1 = {
+		"f" : [
+			("head.input", {"file":files, "convert_timestamps":True}),
+			("utility.narrate", params)
+		]
+	}
+	
+	if sortdata:
+		cfg = cfg1
+	else:
+		cfg = cfg2
+
+
+	n = pipeline.ProcessingNode("localhost", False, [], cfg)
+	n.run()
+
+
+if len(sys.argv) < 2:
+	print usage
+	sys.exit(0)
+
+mode = sys.argv[1]
+
+if mode in ["h","help","-h","--help"]:
+	print usage
+	sys.exit(0)
+elif mode in ["f", "filter"]:
+	runfilter(sys.argv[2:])
+elif mode in ["n", "narrate"]:
+	narrate(sys.argv[2:])
+elif mode in ["d", "daemon"]:
+	print "Parallel processing unimplemented"
+	sys.exit(1)
+elif mode in ["fh", "filterhelp"]:
+	for z in sys.argv[2:]:
+		print filtering.get_filter_help(z)
+elif mode in ["fl", "filterlist"]:
+	for z in sys.argv[2:]:
+		print filtering.get_filter_list(z)
+else:
+	print "Unknown command "+mode
+	print usage
+	sys.exit(1)
+
+

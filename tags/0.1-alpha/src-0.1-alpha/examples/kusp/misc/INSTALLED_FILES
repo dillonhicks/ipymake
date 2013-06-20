@@ -1,0 +1,290 @@
+# Current as of: AUG 2009
+# The files installed on the system when using cmake if where the root of the 
+# installation directory = 'install'.
+#
+
+install/:
+bin/  include/  lib/  share/
+
+install/bin:
+calib*
+clksyncctl*
+daemonTrace*
+dskictrl*
+dskid*
+dski-parse*
+dskitrace*
+dsui-header*
+gschedctrl*
+metaparser*
+netspecd*
+nofilter*
+ns_control*
+postprocess*
+printconfig*
+smartgdb*
+start*
+stop*
+syscall_trace*
+systemMonitor*
+systemMonitorExit*
+testparser*
+traceme*
+trace-me*
+
+install/include:
+ccsm.h         libdsui_dsui.h
+clksyncapi.h   linkedlist.h
+configfile.h   linux/
+dsentity.h     misc.h
+dsheader.h     mutex.h
+dski.h         net.h
+dslist.h       netspec2.h
+dsnamespace.h  rdwr.h
+dsui.h         sched_gsched.h
+exception.h    taskalias.h
+hashtable.h    taskmapper.h
+kusp_common.h  vector.h
+
+install/include/linux:
+clksync.h
+gsched_sdf_mpgd.h
+sched_gsched.h
+
+install/lib:
+libccsm.so*
+libclksync.so*
+libdsui.a
+libdsui_shared.so*
+libgsched.so*
+libkusp.so*
+libnetspec.so*
+python2.5/
+
+install/lib/python2.5:
+site-packages/
+
+install/lib/python2.5/site-packages:
+_ccsm.so*
+clksync/
+clksync-1.0-py2.5.egg-info
+clksync_mod.so*
+configfile_mod-1.0-py2.5.egg-info
+configfile_mod.so*
+datastreams/
+datastreams-1.0-py2.5.egg-info
+discovery/
+discovery-1.0-py2.5.egg-info
+dski_mod.so*
+dsui_mod.so*
+_gsched.so*
+netspec/
+netspec-2.0-py2.5.egg-info
+pyccsm/
+pyccsm-1.0-py2.5.egg-info
+pygsched/
+pygsched-1.0-py2.5.egg-info
+pykusp/
+pykusp-0.1-py2.5.egg-info
+
+install/lib/python2.5/site-packages/clksync:
+clksync.py   __init__.py
+clksync.pyc  __init__.pyc
+
+install/lib/python2.5/site-packages/datastreams:
+dski.py      __init__.pyc
+dski.pyc     namespaces.py
+dsui.py      namespaces.pyc
+dsui.pyc     postprocess/
+__init__.py
+
+install/lib/python2.5/site-packages/datastreams/postprocess:
+dcg.py          inputs.pyc
+dcg.pyc         ltt.py
+entities.py     ltt.pyc
+entities.pyc    outputs.py
+event_data.py   outputs.pyc
+event_data.pyc  pipeline.py
+filtering.py    pipeline.pyc
+filtering.pyc   ppexcept.py
+filters/        ppexcept.pyc
+headfilter.py   queues.py
+headfilter.pyc  queues.pyc
+__init__.py     syscall.py
+__init__.pyc    syscall.pyc
+inputs.py
+
+install/lib/python2.5/site-packages/datastreams/postprocess/filters:
+conversion.py
+conversion.pyc
+dcg.py
+dcg.pyc
+debug.py
+debug.pyc
+discovery_pre_process.py
+discovery_pre_process.pyc
+discovery.py
+discovery.pyc
+entities.py
+entities.pyc
+event_data.py
+event_data.pyc
+filtering.py
+filtering.pyc
+graph.py
+graph.pyc
+group_sched.py
+group_sched.pyc
+headfilter.py
+headfilter.pyc
+head.py
+head.pyc
+__init__.py
+__init__.pyc
+input_output.py
+input_output.pyc
+inputs.py
+inputs.pyc
+javaFilter.py
+javaFilter.pyc
+kernel.py
+kernel.pyc
+ltt.py
+ltt.pyc
+netwo.py
+netwo.pyc
+nx1.py
+nx1.pyc
+output.py
+output.pyc
+outputs.py
+outputs.pyc
+pipeline.py
+pipeline.pyc
+ppexcept.py
+ppexcept.pyc
+queues.py
+queues.pyc
+reduction.py
+reduction.pyc
+sanity.py
+sanity.pyc
+syscall.py
+syscall.pyc
+systemMonitor.py
+systemMonitor.pyc
+text_narration.py
+text_narration.pyc
+utility2.py
+utility2.pyc
+utility.py
+utility.pyc
+
+install/lib/python2.5/site-packages/discovery:
+__init__.py
+__init__.pyc
+kernel_constants.py
+kernel_constants.pyc
+oca_definitions.py
+oca_definitions.pyc
+syscall_numbers.py
+syscall_numbers.pyc
+
+install/lib/python2.5/site-packages/netspec:
+daemon.py    __init__.pyc
+daemon.pyc   protocol.py
+__init__.py  protocol.pyc
+
+install/lib/python2.5/site-packages/pyccsm:
+ccsmapi.py   __init__.py
+ccsmapi.pyc  __init__.pyc
+
+install/lib/python2.5/site-packages/pygsched:
+group_api.py
+group_api.pyc
+group_entities.py
+group_entities.pyc
+group_lib.py
+group_lib.pyc
+group_sched_state.py
+group_sched_state.pyc
+gschedapi.py
+gschedapi.pyc
+gsparsingtags.py
+gsparsingtags.pyc
+gssdf.py
+gssdf.pyc
+gssession.py
+gssession.pyc
+gsstructures.py
+gsstructures.pyc
+__init__.py
+__init__.pyc
+
+install/lib/python2.5/site-packages/pykusp:
+configfile.py
+configfile.pyc
+configparser.py
+configparser.pyc
+configutility.py
+configutility.pyc
+datastore.py
+datastore.pyc
+docdict.py
+docdict.pyc
+doubledict.py
+doubledict.pyc
+filterwidgets.py
+filterwidgets.pyc
+framework.py
+framework.pyc
+__init__.py
+__init__.pyc
+lexerlib.py
+lexerlib.pyc
+lex.py
+lex.pyc
+location.py
+location.pyc
+namespaces.py
+namespaces.pyc
+parseexcept.py
+parseexcept.pyc
+parsers/
+pathfinder.py
+pathfinder.pyc
+remoteD.py
+remoteD.pyc
+setup_pykusp.py
+setup_pykusp.pyc
+taskalias.py
+taskalias.pyc
+yacc.py
+yacc.pyc
+
+install/lib/python2.5/site-packages/pykusp/parsers:
+configfile_parser.py
+configfile_parser.pyc
+group_sched_parser.py
+group_sched_parser.pyc
+__init__.py
+__init__.pyc
+ns_parser_v0.py
+ns_parser_v0.pyc
+ns_parser_v1.py
+ns_parser_v1.pyc
+parserlist.py
+parserlist.pyc
+parser_template.py
+parser_template.pyc
+
+install/share:
+cspec.cspec
+dskid.cspec
+dskid.gsc
+dskid.template
+dstream_admin.ns
+example.dski
+ns.cspec
+pidfilter.dski
+pipes.cspec

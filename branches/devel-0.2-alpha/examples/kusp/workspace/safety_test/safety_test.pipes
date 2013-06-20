@@ -1,0 +1,40 @@
+<main>
+filter_modules = "test.py"
+filters = {
+	dski = [
+		head.input(
+			file = ["/tmp/safety_test.dski.bin/chan1/cpu*.bin"]
+		)
+
+
+	]
+
+	dsui = [
+		head.input(
+			file = ["/tmp/safety_test.dsui.bin"]
+		)
+
+	]
+
+        combined = [
+                head.input(
+                        conn = [dski, dsui]
+                )
+
+		utility.timestamp()
+
+		sort.sort_time()
+
+		utility.narrate(
+			output = "events.txt"
+		)
+
+		test.Verify()
+        ]
+
+}
+
+
+
+
+

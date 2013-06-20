@@ -1,0 +1,351 @@
+#!/usr/bin/env python
+
+from __future__ import with_statement
+
+from datastreams import dski, namespaces
+from datastreams.postprocess import pipeline, filtering, entities
+from netspec import protocol, daemon
+from SocketServer import *
+import sys
+import thread
+import threading
+import pickle
+import signal
+from pykusp import taskalias
+
+taskalias.add_alias_track("dskid")
+
+import time
+import socket
+import getopt
+
+
+port_map = {}
+dskid_lock = threading.Lock()
+
+
+def pid_lookup(pid):
+	try:
+		f = open("/proc/"+`pid`+"/status")
+	except IOError, ie:
+		return "unknown process"
+	l = f.readline()
+	f.close()
+	_, name = l.split()
+	return name
+
+
+class network_discovery(filtering.Filter):
+	def initialize(self):
+		self.connections = {}
+
+		self.tcp_connect_evt = self.get_ns_pointer("DSKITRACE/TCP_CONNECT")
+		self.inet_bind_evt = self.get_ns_pointer("DSKITRACE/INET_BIND")
+		self.fork_evt = self.get_ns_pointer("DSKITRACE/FORK")
+		self.exit_evt = self.get_ns_pointer("DSKITRACE/EXIT")
+
+
+	def process_fork(self, entity):
+		print pid,"forked"
+
+		pass
+
+	def process_exit(self, entity):
+		# i don't think this is even necessary
+		pid = entity.get_pid()
+
+		print pid,"exited"
+
+		with dskid_lock:
+			if pid in port_map:
+				del port_map[pid]
+	
+		pass
+
+	def process_bind(self, entity):
+		port = entity.get_tag()
+		pid = entity.get_pid()
+		name = pid_lookup(pid)
+
+		print name,"("+`pid`+")","bound port",port
+
+		with dskid_lock:
+			port_map[port] = pid
+
+		pass
+
+	def process_connect(self, entity):
+		ed = entity.get_extra_data()
+		pid = entity.get_pid()
+
+		daddr = ed["daddr"]
+		dport = ed["dport"]
+		dhost = socket.gethostbyaddr(daddr)[0]
+		name = pid_lookup(pid)
+		
+		if pid in self.connections:
+			self.connections[pid].append((dhost, dport))
+		else:
+			self.connections[pid] = [(dhost, dport)]
+
+		# if the PID is under dskitrace control, send a message to the
+		# dskid on the remote host to trace the thread we are connecting to
+		#
+		# potential problem: what about connections made before the registration
+		# took place? need a cache or something
+		if taskalias.is_aliased("dskitrace", pid):
+			for dhost, dport in self.connections[pid]:
+				print name,"("+`pid`+")","connected to",daddr+":"+`dport`,dhost
+
+				msg = {
+					"msg" : "start-logging",
+					"port" : dport
+				}
+				
+				try:
+					protocol.send_message(dhost, 14200, msg)
+				except Exception, ex:
+					print ex
+				
+
+	def process(self, entity):
+		if entity.get_family_name() != "DSKITRACE":
+			self.send(entity)
+			return
+
+		if entity.get_cid() == self.inet_bind_evt.get_cid():
+			self.process_bind(entity)
+		elif entity.get_cid() == self.tcp_connect_evt.get_cid():
+			self.process_connect(entity)
+		elif entity.get_cid() == self.fork_evt.get_cid():
+			self.process_fork(entity)
+		elif entity.get_cid() == self.exit_evt.get_cid():
+			self.process_exit(entity)
+
+
+
+		self.send(entity)
+
+
+class ThreadingTCPServer(ThreadingMixIn, TCPServer):
+	pass
+
+class DSKIDHandler(StreamRequestHandler):
+	def handle(self):
+		# handle incoming connection...
+		cfg = protocol.read_config(self.rfile)
+
+		print "dskid got config", cfg
+
+		if cfg["msg"] == "start-logging":
+			with dskid_lock:
+				pid = port_map[cfg["port"]]
+
+			print "placing",pid,pid_lookup(pid),"under dskitrace"
+			trace_pid(pid)
+
+			if ringbuffer_chan:
+				ringbuffer_chan.flush()
+
+		elif cfg["msg"] == "flush":
+			dski_context.flush()
+			# dump ringbuffer...
+		
+		elif cfg["msg"] == "shutdown":
+			shutdown()
+
+		pass
+
+
+
+def setup_ringbuffer_datastream(context):
+	"""Setup the ringbuffer datastream, and return the channel object
+	so that we can flush it when we want to.
+	
+	This datastream logs LOTS of data, but isn't written out unless
+	explicitly flushed -- a flight recorder"""
+	chan = context.create_channel("ring", 5000000, 50,
+			0, ringbuffer=True)
+	enabled = {
+		"SCHED" : True,
+		"SIGNAL_FAM" : True,
+		"SYSCALL" : True,
+		"TASKALIAS": True,
+		"DSKITRACE": True
+	}
+	ring_ds = context.create_datastream("ds_ring", "ring")
+	ds.process_enabled_dict(enabled)
+	return chan
+
+
+def setup_traced_datastream(context, fams=[]):
+	"""Processes that we 'discover' on this box will be
+	traced here.
+	
+	All we need to do to trace a particular process is add it to the
+	'trace-me-dskid' group with taskalias"""
+	chan = context.create_channel("traced", 500000, 30, 0, mmap=True)
+	enabled = {
+		"SCHED" : True,
+		"SIGNAL_FAM" : True,
+		"SYSCALL" : True,
+		"TASKALIAS": True,
+		"DSKITRACE": True
+	}
+
+	for fam in fams:
+		enabled[fam] = True
+
+	filters = [
+		("task", { 
+			"tasks" : [
+				("trace-me-dskid", {"response" : "ACCEPT"})
+			],
+			"default_response" : "REJECT"		
+		})
+	]	
+
+	ds = context.create_datastream("ds_traced", "traced")
+	ds.process_enabled_dict(enabled)
+	ds.process_filter_list(filters)
+
+
+def trace_pid(pid):
+	if not taskalias.is_aliased("dskitrace", pid):
+		# FIXME: existing threads needs to be added to the group also!
+		taskalias.add_alias_track("trace-me-dskid", pid)
+		taskalias.add_alias_track("dskitrace", pid)
+
+
+class OnlineProcessingThread(threading.Thread):
+	def __init__(self, context):
+		threading.Thread.__init__(self)
+		# create a channel with no reader threads. the
+		# debugFS files will be parsed directly by postprocess
+		chan = context.create_channel("online", 500000, 4,
+				0, mmap=False, threadless=True)
+
+		inputs = chan.get_input_filenames()
+		ds = context.create_datastream("ds_online", "online")
+		enabled = {
+			"DSKITRACE" : True,
+		}
+		ds.process_enabled_dict(enabled)
+
+		pp_cfg = {
+			"dskid" : [
+				("head.input", {
+					"streaming_file" : inputs,
+				 }),
+				(network_discovery, {}),
+				("utility.narrate", {
+					"print_extra_data" : True,
+					"show_admin" : False
+				}),
+			]
+		}
+		self.dspp = pipeline.ProcessingNode("dskid", False, [], pp_cfg)
+
+		print "op_thread initialized"
+		
+	def run(self):
+		# never returnsi
+		self.dspp.run_single()
+
+
+class DSKIDHandlerThread(threading.Thread):
+	def __init__(self):
+		threading.Thread.__init__(self)
+		self.server = ThreadingTCPServer(('',14200), DSKIDHandler)
+	def run(self):
+		self.server.serve_forever()
+
+
+def shutdown():
+	dski_context.close()
+	sys.exit(0)
+
+def sighandler(signum, frame):
+	print "DSKID Caught signal", signum
+	shutdown()
+
+
+def cleanup_phase(cfg=None):
+        output_files = dski_context.get_output_filenames()
+
+	print "CLOSING DSKI"
+	dski_context.close()
+	print "CLOSE COMPLETE"
+
+	daemon.ns_acknowledge(daemon.NS_OK_EXIT, filename=output_files)
+
+def start_phase(cfg):
+	global dski_context
+	global ringbuffer_chan
+
+	dski_context = dski.dski_context("/tmp/dskid")
+	# setup datastreams
+	op_thread = OnlineProcessingThread(dski_context)
+	op_thread.setDaemon(True)
+	op_thread.start()
+
+	#ringbuffer_chan = setup_ringbuffer_datastream(dski_context)
+	ringbuffer_chan = None
+
+	extra_fams = cfg["extra-fams"]
+
+	setup_traced_datastream(dski_context, extra_fams)
+	dski_context.start_logging()
+
+        dskid_thread = DSKIDHandlerThread()
+	dskid_thread.setDaemon(True)
+	dskid_thread.start()
+
+        daemon.ns_acknowledge(daemon.NS_OK)
+
+
+print 'Processing command line'
+try:
+        opts, files = getopt.getopt(sys.argv[1:],
+			"hn:",
+                        ["help", "netspec="])
+except getopt.GetoptError:
+        usage()
+        sys.exit(2)
+
+netspec_fd = None
+
+for o, a in opts:
+        if o in ['-h', '--help']:
+                usage()
+                sys.exit()
+        if o in ['-n', '--netspec']:
+                netspec_fd = int(a)
+
+if netspec_fd:
+	print "Using NETSPEC"
+        daemon.ns_set_execute("start", None, start_phase)
+        daemon.ns_set_execute("cleanup", None, cleanup_phase)
+        daemon.ns_begin(netspec_fd)
+
+
+signal.signal(signal.SIGINT, sighandler)
+
+dski_context = dski.dski_context("/tmp/dskid")
+# setup datastreams
+op_thread = OnlineProcessingThread(dski_context)
+op_thread.setDaemon(True)
+op_thread.start()
+
+#ringbuffer_chan = setup_ringbuffer_datastream(dski_context)
+ringbuffer_chan = None
+
+setup_traced_datastream(dski_context)
+dski_context.start_logging()
+
+server = ThreadingTCPServer(('',14200), DSKIDHandler)
+server.serve_forever()
+
+signal.pause()
+
+shutdown()

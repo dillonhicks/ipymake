@@ -1,0 +1,228 @@
+@define RAWDATA /tmp/rawdata/
+
+<camera>
+filters = {
+
+	cthulhu = [
+		head.input(
+			file = [
+				"$(RAWDATA)/cthulhu_camserv/camserv.dsui.bin"
+				"$(RAWDATA)/cthulhu_vidserv/vidserv.dsui.bin"
+				"$(RAWDATA)/cthulhu_clksync/clksync.dsui.bin"
+			]
+			extra_data = "cameraedf.py"
+
+			convert_timestamps = true
+		)
+		utility.sort()
+	]
+
+
+	testbed50 = [
+		head.input(
+			file = [
+				"$(RAWDATA)/testbed50_watcher/watcher.dsui.bin"
+				"$(RAWDATA)/testbed50_clksync/clksync.dsui.bin"
+			]
+			extra_data = "cameraedf.py"
+
+			convert_timestamps = true
+		)
+		utility.sort()
+	]
+
+	testbed51 = [
+		head.input(
+			file = [
+				"$(RAWDATA)/testbed51_display/kuim_display.dsui.bin"
+				"$(RAWDATA)/testbed51_clksync/clksync.dsui.bin"
+			]
+			extra_data = "cameraedf.py"
+
+			convert_timestamps = true
+		)
+		utility.sort()
+	]
+
+
+	main = [
+		head.input(
+			conn =[cthulhu, testbed50, testbed51]
+			namespace = { 
+
+				"INTERVALS" = {
+					entities = {
+						COMPLETE_LOOP = interval(
+							desc = "Read frame from camera --> Movement finished"
+						)
+						FRAME = interval(
+							desc = "user-to-user frame xmission time cthulhu-->testbed51"
+						)
+						FRAME2 = interval(
+							desc = "user-to-user frame xmission time testbed50-->testbed51"
+						)
+
+					}
+				}	
+				"HISTOGRAMS" = {
+					entities = {
+						COMPLETE_LOOP = histogram(
+							desc = "Read frame from camera --> Movement finished"
+							units = "ms"
+						)
+						FRAME = histogram(
+							desc = "user-to-user frame xmission time"
+							units = "ms"
+						)
+						PROCESS = histogram(
+							desc = "per-frame processing time"
+							units = "ms"
+						)
+					}
+				}
+				"AGGREGATE" = {
+					entities = {
+						FRAME_AVG = event(
+							desc = "avg/variance"
+						)
+						COMPLETE_AVG = event(
+							desc = "foo"
+						)
+					}
+				}
+
+			}
+		)
+
+		utility.narrate(
+			divisor = 1000000
+			output = "raw_narration.txt"
+			print_extra_data = true
+		)
+
+		conversion.interval_to_histogram(
+			interval = "TRACK_THREAD/PROCESS"
+			histogram = "HISTOGRAMS/PROCESS"
+			buckets = 100
+		)
+		conversion.event_to_interval(
+			start_event = "NETWORK_SERVER/SENDING_FRAME"
+			end_event = "NETWORK_CLIENT/RECVD_FRAME"
+			interval = "INTERVALS/FRAME"
+			start_machine = "cthulhu"
+			end_machine = "testbed50"
+		)
+
+
+	]
+
+	process = [
+		head.input(conn = main(index = -2, output = "histograms"))
+		graph.histogram(
+			histogram = "HISTOGRAMS/PROCESS"
+			divisor = 1000000
+			filename = "graphs/process"
+		)
+	]
+
+	frame1 = [
+		head.input(conn = main(index = -1, output = "intervals"))
+		conversion.interval_to_histogram(
+			interval = "INTERVALS/FRAME"
+			histogram = "HISTOGRAMS/FRAME"
+			buckets = 100
+			#lowerbound = 15000000
+			#upperbound = 25000000
+		)
+		graph.histogram(
+			histogram = "HISTOGRAMS/FRAME"
+			divisor = 1000000
+			title = "User-to-user frame transmission interval"
+			filename = "graphs/frame"
+		)
+		reduction.interval(
+			src_interval = "INTERVALS/FRAME"
+			dest_event = "AGGREGATE/FRAME_AVG"
+			consume = true
+			operation = mean
+		)	
+	]
+
+	frame2 = [
+		head.input(conn = main(index = -1, output = "intervals"))
+		conversion.interval_to_histogram(
+			interval = "INTERVALS/FRAME"
+			histogram = "HISTOGRAMS/FRAME"
+			buckets = 100
+		)
+		graph.histogram(
+			histogram = "HISTOGRAMS/FRAME"
+			divisor = 1000000
+
+			title = "User-to-user frame transmission interval"
+			filename = "graphs/frame2"
+			yaxis_log = true
+		)
+	]
+
+	complete = [
+		head.input(conn = main)
+		camerafilters.frame_kill()
+		
+		utility.tag_copy(
+			src_event = "TRACK_THREAD/MOVE_DECISION"
+			dest_event = "SERVER/DO_RECV_DONE"
+		)
+		
+		
+		conversion.event_to_interval(
+			start_event = "CAPTURE/READ_FRAME"
+			end_event = "SERVER/DO_RECV_DONE"
+			consume = true
+			interval = "INTERVALS/COMPLETE_LOOP"
+			tag_match = true
+		)
+	]
+
+	complete2 = [
+		head.input(conn = complete(output = "intervals"))
+		utility.narrate(
+			divisor = 1000000
+			output = "data/intervals.txt"
+		)
+		conversion.interval_to_histogram(
+			interval = "INTERVALS/COMPLETE_LOOP"
+			histogram = "HISTOGRAMS/COMPLETE_LOOP"
+			buckets = 100
+			#lowerbound = 532800000
+			#upperbound = 541000000
+		)
+		graph.histogram(
+			histogram = "HISTOGRAMS/COMPLETE_LOOP"
+			divisor = 1000000
+			title = "End-to-end Control Loop"
+			filename = "graphs/complete"
+		)
+		reduction.interval(
+			src_interval = "INTERVALS/COMPLETE_LOOP"
+			dest_event = "AGGREGATE/COMPLETE_AVG"
+			consume = true
+			operation = mean
+		)
+	]
+
+	aggregate = [
+		head.input(conn = [
+			complete2(output="reduced")
+			frame1(output="reduced")
+			]
+		)
+		utility.narrate(
+			print_extra_data = true
+		)
+	]
+
+}
+
+
+

@@ -1,0 +1,15 @@
+@define hosts = testbed117 testbed118 testbed119 testbed120
+
+<clksync_run>
+hostnames = [$(hosts)]
+logfile = "clksyncrun.log"
+commands = ["synchronize testbed129"]
+outfile = {
+	remotepath = "/tmp/clksync.dsui.bin"
+	localpath = "rawdata/clksync.dsui.bin"
+	addhost = true
+}
+
+<clksync_stop>
+hostnames = [$(hosts)]
+commands = ["killall synchronize"]

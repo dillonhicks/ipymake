@@ -1,0 +1,187 @@
+#!/usr/bin/env python
+# Trace Me Tool
+# authors: Bala Sridhar and Michael Jantz
+
+import sys
+import os
+import optparse
+import tempfile
+import subprocess as sp
+import signal
+import pyccsm.ccsmapi as ccsm_mod
+from datastreams import dski
+from datastreams import dsui
+
+class traceme():
+
+	def __init__(self):
+		self.buffer_count = 50
+		self.buffer_size = 500000
+
+		self.enabled_families = [
+			'FIFO',
+		      	'FORK',
+			'EXIT',
+			'ROOT_THREAD',
+			'SIGNAL',
+			'SHMEM',
+			'PIPE',
+			'TRAC',
+			'FILE',
+#			'PTRACE',
+			'EXECVE',
+			'SOCKET',
+			'TCP_LAYER',
+			'IP_LAYER',
+#			'UDP_LAYER',
+#			'INET',
+			'NET_DEVICE_LAYER_FAM',
+			'NET_DEVICE_LAYER',
+			'REGULAR_IRQ_FAM',
+			'GENERAL_TIMER_FAM',
+			'E100',
+			'SYSCALL',
+			'SYSTEM_COMP'
+#			'SCHEDULER'
+		]
+
+		self.pid = None
+		self.ccsm_set_name = None
+
+	def init_dski(self):
+
+		traceme_ds_context = None
+		try:
+			# Create the DS Python context for configuration and
+			# logging of the event stream. Note that we tell it the
+			# name of the logging output file, which it opens and
+			# associates with this context
+			#
+			datadir = tempfile.mkdtemp(suffix="_dski",dir="data")
+			traceme_ds_context = dski.dski_context(datadir)
+		except IOError:
+			print "Unable to open DSKI device. Is the module loaded???"
+			sys.exit(1)
+
+		# Allocate the desired number of buffers and the total buffer size
+		# as configured and associate them with this DSKI context. Note
+		# that these resources are associated with the name "chan1".
+		#
+		chan = traceme_ds_context.create_channel("chan1", self.buffer_size, self.buffer_count, 0)
+
+		# This actually creates the data stream, named "ds1" which will
+		# use the buffer resouces represented by "chan1". 
+		#
+		ds = traceme_ds_context.create_datastream("ds1", "chan1")
+
+		# Enable DSKI for the families that were listed above 
+		#
+		for ename in self.enabled_families:
+			ds.enable_family(ename)
+
+		# FIXME: Rearrange active filter code so that we just call add_filter
+		# and give arguments to each filter. Use a namespace to name the filters.
+		#
+		# Attach the filters required for traceme to work to
+		# our datastream
+		#
+		ds.discovery_filter(self.ccsm_set_name)				
+		ds.task_filter(self.pid, self.ccsm_set_name, 'ACCEPT')
+#		ds.strace_filter(self.ccsm_set_name)				
+
+		return traceme_ds_context
+
+	def using_exec_method(self, traced_cmd):
+		
+		print "Using my method......."
+		child_pid = os.fork()
+		if child_pid == 0:
+			try:
+				os.execvp(traced_cmd,None)
+			except OSError, e:
+				print e
+				sys.exit(e.errno)
+			finally:
+				sys.exit(1)
+		else:
+			try:
+				stopped_pid, ret = os.waitpid(child_pid, 0)
+			except KeyboardInterrupt:
+				print "Interrupt caught a keyboard interrupt"
+
+	def main(self):
+	
+		# Since the "traceme" tool is meant to trace an arbitrary command
+		# line, we currently assume that all arguments on the command line are
+		# for the traced command, rather than for "traceme". The standard use
+		# of traceme is:
+		#
+		#   bash> traceme cmd <cmd-args>
+		#
+		# Here we have to use Optparse in an unusual way, because while it
+		# will try to examine everything to the right of "traceme" for
+		# correctness according to the specified argument constraints, we can
+		# make no such specification because we want to be able to trace
+		# arbitrary commands with arbitrary arguments. Thus, we create the
+		# parser, and then call "parser.disable_interspersed_args()" to tell
+		# it to not check correct ness constraints on the arguments, as is
+		# required in all normal uses of command line argument parsing.
+		#
+		parser = optparse.OptionParser()
+		parser.disable_interspersed_args()
+
+		#
+		# here we parse the command line arguments in lists. The list
+		# traced_cmd_pieces contains the list of components comprising 
+		# "cmd <cmd-args>"
+		#
+		(traceme_cmd,traced_cmd_pieces) = parser.parse_args()
+
+		#
+		# Here we use "traced_cmd" to reconstruct the components of the
+		# command line we are being asked to trace. Note that in this loop is
+		# where we can look fo any arguments to the "traceme" command, if we
+		# need to create some, and separate them out from those of the traced
+		# command.
+		#
+		
+
+		if traced_cmd_pieces[0].isdigit():
+			traced_cmd = int(traced_cmd_pieces[0])
+		else:
+			traced_cmd =''
+			for piece in traced_cmd_pieces:
+				traced_cmd = traced_cmd + piece + ' ' 
+
+		self.pid = os.getpid()
+		self.ccsm_set_name = "traceme_" + `self.pid`
+		self.traceme_thread_name = "Traceme Thread_" + `self.pid`
+
+		# Create the CCSM set representing the traceme thread.
+		self.ccsm_fd = ccsm_mod.ccsm_open()
+		ccsm_mod.ccsm_create_set(self.ccsm_fd, self.ccsm_set_name,0)
+		ccsm_mod.ccsm_create_component_self(self.ccsm_fd, self.traceme_thread_name)
+		ccsm_mod.ccsm_add_member(self.ccsm_fd, self.ccsm_set_name,self.traceme_thread_name)
+
+		# Send information about the traceme thread.
+		dsui_output = tempfile.mkstemp(suffix="_traced.dsui.bin", dir="data")[1]
+		dsui.start(dsui_output, 0)
+		dsui.event("TRACEME", "TRACEME_TOOL", os.getpid())
+		dsui.close()
+
+		# Start DSKI
+		traceme_ds_context = self.init_dski()
+		traceme_ds_context.start_logging()
+
+		if not traced_cmd_pieces[0].isdigit():
+			os.system(traced_cmd)
+
+		traceme_ds_context.close()
+		
+		ccsm_mod.ccsm_remove_member(self.ccsm_fd, self.ccsm_set_name, self.traceme_thread_name)
+		ccsm_mod.ccsm_destroy_component_by_name(self.ccsm_fd, self.traceme_thread_name)
+		ccsm_mod.ccsm_destroy_set(self.ccsm_fd, self.ccsm_set_name)
+
+if __name__ == "__main__":
+	tracer = traceme()
+	tracer.main()

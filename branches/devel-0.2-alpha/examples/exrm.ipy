@@ -1,0 +1,21 @@
+
+destroy_patterns = [ "ipym*", "*store.txt", "*~", "build"]
+
+def gen_dirs(root_dir):
+    for root, dirs, files in os.walk(root_dir):
+        for direct in dirs:
+	    if not direct.startswith('.svn'):    	
+                gen_dirs(direct)
+	yield root
+
+
+def gen_rm_commands():
+    for edir in gen_dirs(os.getcwd()):
+    	rm_string = "rm -rfv "
+	for pat in destroy_patterns:
+    	    rm_string += " %s/%s" % (edir,pat)
+	yield rm_string
+
+if __name__ == "__main__":
+   for cmd in gen_rm_commands():
+       !$cmd

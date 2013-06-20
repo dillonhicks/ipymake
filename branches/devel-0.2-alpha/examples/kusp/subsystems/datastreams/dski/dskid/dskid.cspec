@@ -1,0 +1,144 @@
+<task_filter>
+default_response = {
+	types = "string"
+	constraints = [
+		"ACCEPT",
+		"REJECT",
+		"PASS",
+		"NEGATE"
+	]
+	default = "ACCEPT"
+}
+tasks = {
+	types = "list"
+	listdef = {
+		types = "invocation"
+		openinvodef = {
+			response = {
+				types = "string"
+				constraints = [
+					"ACCEPT",
+					"REJECT",
+					"PASS",
+					"NEGATE"
+				]
+				default = "REJECT"
+			}
+		}
+	}
+}
+
+
+<root>
+types = "dictionary"
+doc = "DSKI relay channel definitions"
+dictdef = {
+	dski = @dski,
+	channels = @channels,
+	datastreams = @datastreams
+}
+
+
+<dski>
+types = "dictionary"
+doc = "DSKI relay channel definitions"
+dictdef = {
+	child = {
+		types = "string"
+		doc = "child process to run during logging"
+	}
+	output_base = {
+		types = "string"
+		doc = "Base path for binary output"
+		default = "/tmp/dski"
+	}
+	duration = {
+		types = "integer"
+		doc = "period (in seconds) to log events, 0 logs forever"
+		default = 0
+	}
+	verbose = {
+		types = "boolean"
+		doc = "print debugging messages"
+		default = false
+	}
+}
+
+<channels>
+types = "dictionary"
+doc = "DSKI relay channel definitions"
+opendictdef = {
+	types = "dictionary"
+	doc = "DSKI Channel Parameters"
+	required = true
+	dictdef = { 
+		buffer_size = {
+			types = "integer"
+			doc = "Set size of kernel relay buffers"
+			default = 500000
+		}
+		buffer_count = {
+			types = "integer"
+			doc = "Number of kernel relay buffers"
+			default = 50
+		}
+	}
+}
+
+<datastreams>
+types = "dictionary"
+doc = "DSKI daemon configuration file"
+opendictdef = {
+	types = "dictionary"
+	doc = "DSKI Parameters"
+	required = true
+	dictdef = {
+		channel = {
+			types = "string"
+			doc = "DSKI Channel to log data to"
+			default = "default"
+		}
+		filters = {
+			types = "list"
+			listdef = {
+				types = "invocation"
+				invodef = {
+					task = @task_filter
+				}
+			}
+			default = []
+			doc = "list of filters for this datastream"
+		}
+		enabled = {
+			types = ["dictionary", "boolean"]
+			doc = "Enabled kernel families"
+			required = true
+			opendictdef = {
+				types = ["list" "boolean"]
+				listdef = {
+					types = ["string" "invocation"]
+					openinvodef = {
+						buckets = {
+							types = "integer"
+							default = 20
+						}
+						lowerbound = {
+							types = "long"
+							default = 0L
+						}
+						upperbound = {
+							types = "long"
+							default = 0L
+						}
+						tune = {
+							types = "integer"
+							default = 100
+						}
+					}
+					doc = "Entity to enable"
+				}
+				doc = "List of enabled events within family"
+			}
+		}
+	}
+}

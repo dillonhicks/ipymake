@@ -1,0 +1,433 @@
+#!/usr/bin/env python
+# System Monitor Tool
+# author: Bala Sridhar
+
+import sys
+import os
+import optparse
+import tempfile
+import subprocess as sp
+import signal
+import pickle
+from threading import Thread
+from pykusp import taskalias
+from pykusp import configfile
+from datastreams import dski
+from datastreams import dsui
+from datastreams.postprocess import pipeline
+from discovery.syscall_numbers import *
+
+
+# This is a derived class of the Exception class used for raising the exception
+# when the systemMonitorExit tool sends a signal to the systemMonitor session.
+class TerminationException(Exception):
+
+	def __init__(self, value):
+		self.value = value
+	
+	def __str__(self):
+		return repr(self.value)
+
+# This class is the reading thread that is instantiated by the system monitor tool once the filtering 
+# starts. The main function of this class is to monitor the proc file for information written by the 
+# kernel side active filter.
+class readingProcThread(Thread):
+
+	def __init__(self,name):
+		"""This function does the initialization of the reader thread with the proc
+		file that it needs to monitor, to look out for information coming from the 
+		kernel side.
+		"""
+		self.file_to_read = "/proc/"+name
+		Thread.__init__(self)
+		self.kill_thread = False
+
+	def run(self):
+		"""This part of the code is what the thread would be executing once started.
+		"""
+		while(not self.kill_thread):
+			self.proc()
+		
+	def proc(self):
+		"""used for reading the proc file. once we get information out of the proc file
+		we send information to the kernel that we have finished reading the information
+		sent.After reading the proc file we do a traceme on that pid.
+		"""
+		f = open(self.file_to_read, "r")
+		pid_list = f.readlines()
+		#print "size :", len(pid_list)
+		if len(pid_list) > 0:
+			for pid in pid_list:
+				if self.check_status_of_process(pid):
+					print "pid read :",pid
+					#os.system("traceme "+pid);
+			self.write_to_kernel()
+		f.close()
+	
+	def kill(self, value):
+		"""Used for setting the kill_thread variable to signify to this thread that it 
+		can stop monitoring the proc file.
+		"""
+		self.kill_thread = value
+
+	def write_to_kernel(self):
+		"""Used for writing to the proc file. which will be read on the kernel side, to 
+		clear the procfs buffer.
+		"""
+		f = open(self.file_to_read,"w")
+		f.write("Read the Information\n")
+		f.close()
+
+	def check_status_of_process(self,pid):
+		"""Used for checking whether a process is still alive, based on that we return true 
+		or false.
+		"""
+		try:
+			os.kill(pid,0)
+			return True
+		except Exception, ex:
+			return False
+
+# This is the System Monitoring tool.Used for identifying things that we care about being used by 
+# various applications running in the system.
+class systemMonitor():
+
+	def __init__(self,level):
+		"""This is the Initialization function. here we set the buffer count and buffer size for the 
+		DSKI Instrumentation Logging. We also define the config file language to be used along with 
+		this tool.
+		"""
+		self.buffer_count = 50
+		self.buffer_size = 500000
+
+		self.debug_level = level
+		
+		# Family of instrumentation points to look out for.
+		self.enabled_families = [
+			'SMON',
+			'SYSCALL',
+			'EXECVE'
+		]
+
+		#FIXME: Move the string to the global part of the file and define it 
+		# as a string constant. Give the string constant as an argument to 
+		# the function below.
+		self.config_spec = configfile.parse_string("""
+		<root>
+		types = "dictionary"
+		doc = "System Monitor related Stuff"
+		dictdef = {
+		open_monitor = @open_monitor
+		}
+
+		<open_monitor>
+		types = "dictionary"
+		default = {}
+		doc = "monitoring system components"
+		opendictdef = {
+			types = "dictionary"
+			doc = "components to be monitored"
+			required = true
+			dictdef = {
+				monitor_name = {
+					types = "string"
+					doc = "system monitor tool name"
+					required = true
+					default = ""
+				}
+				monitor_output_log_file = {
+					types = "string"
+					doc = "dski output log file path"
+					default = ""
+				}
+				shared_library = {
+					types = "list"
+					listdef = {
+						types = "string"
+					}
+					doc ="List of shared libraries to look out for"
+					default = []
+				}
+				system_calls = {
+					types = "list"
+					listdef = {
+						 types = "string"
+					}
+					doc = "List of system calls to look out for"
+					default = []
+				}
+
+			}
+		}
+		""")
+		
+		self.config_spec = configfile.check_spec(self.config_spec)
+		# Status flag used for identifying whether the tool was started with a -c option and the
+		# config file to be used is also provided as part of the arguments.
+		self.config_available = False
+		self.pid = None
+		self.reading_thread = None
+
+	def init_dski(self, list, sysCall,procfile_name):
+		"""All the initialization with respect to the DSKI Event Logging Capability is 
+		done here and also the information required for the systemMonitor Active filter to
+		work is also passed.
+		"""
+		systemMonitor_ds_context = None
+		try:
+			# Create the DS Python context for configuration and
+			# logging of the event stream. Note that we tell it the
+			# name of the logging output file, which it opens and
+			# associates with this context
+			#
+			#datadir = tempfile.mkdtemp(suffix="_dski",dir="/tmp/data")
+			systemMonitor_ds_context = dski.dski_context(self.monitor_log_file_name)
+		except IOError:
+			print "Unable to open DSKI device. Is the module loaded???"
+			sys.exit(1)
+
+		# Allocate the desired number of buffers and the total buffer size
+		# as configured and associate them with this DSKI context. Note
+		# that these resources are associated with the name "chan1".
+		#
+		chan = systemMonitor_ds_context.create_channel("chan1", self.buffer_size, self.buffer_count, 0)
+
+		# This actually creates the data stream, named "ds1" which will
+		# use the buffer resouces represented by "chan1". 
+		#
+		ds = systemMonitor_ds_context.create_datastream("ds1", "chan1")
+
+		# Enable DSKI for the families that were listed above 
+		#
+		for ename in self.enabled_families:
+			ds.enable_family(ename)
+
+		# FIXME: Rearrange active filter code so that we just call add_filter
+		# and give arguments to each filter. Use a namespace to name the filters.
+		#
+		# Attach the filters required for systemMonitor to work to
+		# our datastream
+		#
+		userid = os.getuid()
+		ds.systemMonitor_filter(list, sysCall, procfile_name, userid)				
+		
+		return systemMonitor_ds_context
+
+	def config_callback(self, option,opt,value,parser):
+		"""This function is called when the tool is started with the -C option
+		"""
+		c = self.check_config_syntax(value)
+		self.process_config(c)
+
+	def config_traceme_on_callback(self, option,opt,value,parser):
+		"""This function is called when the tool is started with the -T option
+		"""
+		c = self.check_config_syntax(value)
+		self.process_config(c)
+		self.reading_thread = readingProcThread(self.monitorName)
+
+	def check_config_syntax(self, value):
+		"""This function is used for checking whether the config file provided is 
+		consistent with the recommended syntax.
+		"""
+		if self.debug_level == 1:
+			print "Real Path : ",os.path.realpath(value)
+		self.ConfigFilePath = os.path.realpath(value)
+		try: 
+			c= configfile.parse_config(value,self.config_spec)
+		except Exception,e:
+			print e
+			sys.exit(0)
+
+		return c
+	
+	def process_config(self,cfg):
+		"""Used for gathering information from the provided config file as part of 
+		arguments to the tool.
+		"""
+		for name, v in cfg["open_monitor"].items():
+			self.sharedList = v["shared_library"]
+			self.monitorName = v["monitor_name"]
+			if v["monitor_output_log_file"]:
+				self.monitor_log_file_name = v["monitor_output_log_file"]
+			else:
+				(filePath, fileName) = os.path.split(self.ConfigFilePath)
+				self.monitor_log_file_name = filePath+'/'+self.monitorName+'/'
+
+			self.systemCalls = self.getSyscallNumbers(v["system_calls"])
+		# Since we are able to gather information we set the status flag to true
+		# to indicate that a config file was provided to start the tool.
+		self.config_available = True
+		self.check_whether_path_exist()
+
+	def show_config_help(self, option, opt, value, parser):
+		"""Used for giving out information on how to use the tool.
+		"""
+		configfile.get_spec_help(sys.stdout, self.config_spec)
+		sys.exit(0)
+
+	def reload_monitor(self, option, opt, value, parser):
+		"""Used for reloading an already monitoring tool with a new config file.
+		The way it is accomplished is we stop the monitoring tool and then restart
+		it again with a new config file.
+		"""
+		if self.debug_level == 1:
+			print "Reloading taking place........"
+		con = self.check_config_syntax(value)
+		self.process_config(con)
+
+		try: 
+			f = open('/tmp/'+self.monitorName+'.pid','r')
+			dict = pickle.load(f)
+			pids = dict['pid']
+			f.close()
+			os.system('kill -15 '+pids)
+			os.system('rm -f /tmp/'+self.monitorName+'.pid')
+
+		except Exception, e:
+			print 'reloading not proper ',e
+			sys.exit(0)
+		
+		return
+
+	def check_whether_path_exist(self):
+		"""Used for identifying whether the dski logging file already exist in the 
+		filesystem.
+		"""
+		if os.path.exists(self.monitor_log_file_name):
+			print "DSKI output file already exists. please check your argument monitor_log_file_name in your configuration script"
+			sys.exit(0)
+
+	def terminationSignalHandler(self, signum, frame):
+		""" Used for handling any signal sent to the tool. It shuts down the tool from 
+		monitoring.
+		"""
+		if self.debug_level == 1:
+			print "Inside the signal Handler"
+		raise TerminationException, "Closing the Stream"
+
+	def getSyscallNumbers(self, list):
+		"""Used for converting system call names into their corresponding numbers.
+		"""
+		if self.debug_level == 1:
+			print "Inside syscall numbers", list
+		num = 0
+		for sysCall in list:
+			list[num] = getSyscallNum(sysCall)
+			num = num + 1
+		return list
+
+	#FIXME: Will have to make this function do a pretty print.
+	def show_all_sessions(self,option, opt, value, parser):
+		"""Used for displaying all the currently executing systemMonitor sessions in the system.
+		"""
+		print "Displaying all Sessions"
+		sessions_list = self.get_session_names("/tmp/")
+		print "Session Names : ", sessions_list
+		print "path names : ", self.get_config_files(sessions_list,"/tmp/")
+		sys.exit(0)
+			
+	def get_session_names(self, directory):
+		"""Used for getting the session names from the 'session_name.pid' files present in the
+		/tmp directory"""
+		fileList = []
+		for f in os.listdir(directory):
+			if f.endswith(".pid"):
+				session_name = f.replace(".pid", "")
+				fileList.append(session_name)
+		return fileList
+	
+	def get_config_files(self, session_list, directory):
+		"""Used for getting the config file paths for the different sessions running in the system.
+		"""
+		configfiledict = {}
+		for file in os.listdir(directory):
+			for f in session_list:
+			     if file.startswith(f):
+				  obj = open('/tmp/'+file,'r')
+				  dict = pickle.load(obj)
+				  configfiledict[f] = dict['path']
+
+	        return configfiledict
+
+
+	def main(self):
+		"""This function acts as a controller for all the features that is provided by the tool.
+		If a config file is provided to start the tool then we fork of a process and that takes care
+		of starting the system Monitor active filter and event logging.
+		"""
+		parser = optparse.OptionParser()
+
+		parser.add_option("-C","--config", action="callback", callback=self.config_callback,
+				  type = "string", help="Configuration file to use")
+
+		parser.add_option("-H", "--config-help", action="callback", 
+				   callback=self.show_config_help, help="Show help for config files")
+
+		parser.add_option("-A", "--all-sessions", action="callback",
+				   callback=self.show_all_sessions, help="Shows all the currently executing sessions")
+
+		parser.add_option("-R", "--reload", action="callback",
+				   callback=self.reload_monitor, type = "string", help="Reloads the current monitor")
+
+		parser.add_option("-T", "--traceme-on", action="callback", callback=self.config_traceme_on_callback,
+				    type = "string", help="Configuration file to use with traceme switched on")
+
+		[garbage,names] = parser.parse_args()
+		
+		if not self.config_available:
+			print "No config file specified"
+			sys.exit(0)
+
+		if self.debug_level == 1:
+			print "shared Library : ", self.sharedList
+			print "Name of the systemMonitor Tool:", self.monitorName
+			print "System calls :", self.systemCalls
+			print "User id : ", os.getuid()
+
+		signal.signal(signal.SIGTERM, self.terminationSignalHandler)
+
+		pid = os.fork()
+		try:
+			if pid == 0:
+				try:
+					f = open('/tmp/'+self.monitorName+'.pid','w')
+					pids = str(os.getpid())
+					dict = {'pid' : pids, 'path': self.ConfigFilePath}
+					pickle.dump(dict,f)
+					f.close()
+
+					# Start DSKI
+					self.systemMonitor_ds_context = None
+					self.systemMonitor_ds_context = self.init_dski(self.sharedList, self.systemCalls, self.monitorName)
+					if self.reading_thread:
+						self.reading_thread.start()
+					self.systemMonitor_ds_context.start_logging()
+	
+					# Start DSUI
+					dsui_output = tempfile.mkstemp(suffix="_monitor.dsui.bin", dir="/tmp/data")[1]
+					dsui.start(dsui_output, 0)
+					dsui.event("SystemMonitor", "SystemMonitor_TOOL", os.getpid())
+					dsui.close()
+					
+					signal.pause()
+
+				except Exception, e: 
+					if self.debug_level == 1:
+						print "Exiting from the console due to an Error : ", e
+					# Stop the reader thread before closing the datastream.
+					if self.reading_thread:
+						self.reading_thread.kill(True)
+					if self.systemMonitor_ds_context:
+						self.systemMonitor_ds_context.close()
+					os._exit(0)
+			else:
+				os._exit(0)
+
+		except OSError, e:
+				sys.exit(0)
+		
+if __name__ == "__main__":
+	sMonitor = systemMonitor(1)
+	sMonitor.main()
+

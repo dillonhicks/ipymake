@@ -1,0 +1,71 @@
+<DSTREAM_ADMIN_FAM>
+desc = "Datastreams Administrative events"
+id = 0
+entities = {
+	EVENT_ASSOCIATE_NAME = event(
+		desc = "Process-Name association event"
+		extra_data = "print_string"
+		id = 3
+	)
+	EVENT_BUFFER_FLUSH = event(
+		desc = "dsui flushed buffers"
+		id = 10
+	)
+	EVENT_COUNTER = event(
+		desc = "Datastream Counter"
+		extra_data = "get_counter"
+		id = 0
+	)
+	EVENT_CPU_TIME_INFO = event(
+		desc = "CPU Time related information"
+		extra_data = "print_cpu_time_info"
+		id = 9
+	)
+	EVENT_HISTOGRAM = event(
+		desc = "Datastream Histogram"
+		extra_data = "get_histogram_group"
+		id = 1
+	)
+
+	EVENT_INTERVAL = event(
+		desc = "Datastream Interval"
+		extra_data = "get_interval"
+		id = 8
+	)
+	EVENT_OBJECT = event(
+		desc = "Datastream Object"
+		extra_data = "get_object"
+		id = 2
+	)
+
+	HEADER = event(
+		desc = "datastream header"
+		extra_data = "print_header"
+		id = 14
+	)
+	NAMESPACE = event(
+		desc = "namespace event"
+		extra_data = "get_namespace"
+		id = 11
+	)
+	TIME_ADJ = event(
+		desc = "adjustment made to clock"
+		extra_data = "print_timespec"
+		id = 13
+	)
+	TIME_STATE = event(
+		desc = "clksync time info"
+		extra_data = "print_clksync_info"
+		id = 12
+	)
+	DATA_CHUNK = event(
+		desc = "piece of extra data for an event"
+		extra_data = "get_extra_data_chunk"
+		id = 15
+	)
+	NAMESPACE_FRAGMENT = event(
+		extra_data = "get_namespace_fragment"
+		id = 16
+	)
+}
+

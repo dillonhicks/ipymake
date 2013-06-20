@@ -1,0 +1,94 @@
+#!/usr/bin/env python
+# ccsmTest Tool.
+# authors: Bala Sridhar
+
+import sys
+import os
+import optparse
+import signal
+import time
+import pyccsm.ccsmapi as ccsm_mod
+
+class ccsmTest():
+
+	def single(self):
+		
+		ccsm_mod.ccsm_create_set(self.ccsm_fd, self.ccsm_set_name,0)
+		# This was the reason for the kernel panic that was happening... for some reason 
+		# that i am yet to find out i find that this call within the kernel actually fails 
+		# but we are getting mislead by the dmesg prink statements that everything is actually 
+		# working out. And i also think the problem lies within kernel ccsm routine for this api call.
+		# my strong belief is that we are not doing something correctly with the find_get_pid or
+		# get_pid task in the kernel ccsm routine.
+
+		#ccsm_mod.ccsm_create_component_by_pid(self.ccsm_fd, self.ccsmTest_thread_name,self.pid)
+
+		ccsm_mod.ccsm_create_component_self(self.ccsm_fd, self.ccsmTest_thread_name)
+		ccsm_mod.ccsm_add_member(self.ccsm_fd, self.ccsm_set_name,self.ccsmTest_thread_name)
+
+		time.sleep(10)	
+
+		ccsm_mod.ccsm_remove_member(self.ccsm_fd, self.ccsm_set_name, self.ccsmTest_thread_name)
+		ccsm_mod.ccsm_destroy_component_by_name(self.ccsm_fd, self.ccsmTest_thread_name)
+		ccsm_mod.ccsm_destroy_set(self.ccsm_fd, self.ccsm_set_name)
+
+	def four(self):
+
+		ccsm_mod.ccsm_create_set(self.ccsm_fd, self.ccsm_set_name,0)
+		ccsm_mod.ccsm_create_set(self.ccsm_fd, self.ccsm_set_name1,0)
+		ccsm_mod.ccsm_create_set(self.ccsm_fd, self.ccsm_set_name2,0)
+		ccsm_mod.ccsm_create_set(self.ccsm_fd, self.ccsm_set_name3,0)
+
+		#ccsm_mod.ccsm_create_component_by_pid(self.ccsm_fd, self.ccsmTest_thread_name,self.pid)
+		ccsm_mod.ccsm_create_component_self(self.ccsm_fd, self.ccsmTest_thread_name)
+		
+		ccsm_mod.ccsm_add_member(self.ccsm_fd, self.ccsm_set_name,self.ccsmTest_thread_name)
+		ccsm_mod.ccsm_add_member(self.ccsm_fd, self.ccsm_set_name1,self.ccsmTest_thread_name)
+		ccsm_mod.ccsm_add_member(self.ccsm_fd, self.ccsm_set_name2,self.ccsmTest_thread_name)
+		ccsm_mod.ccsm_add_member(self.ccsm_fd, self.ccsm_set_name3,self.ccsmTest_thread_name)
+		
+		time.sleep(10)	
+
+		ccsm_mod.ccsm_remove_member(self.ccsm_fd, self.ccsm_set_name, self.ccsmTest_thread_name)
+		ccsm_mod.ccsm_remove_member(self.ccsm_fd, self.ccsm_set_name1, self.ccsmTest_thread_name)
+		ccsm_mod.ccsm_remove_member(self.ccsm_fd, self.ccsm_set_name2, self.ccsmTest_thread_name)
+		ccsm_mod.ccsm_remove_member(self.ccsm_fd, self.ccsm_set_name3, self.ccsmTest_thread_name)
+		
+		ccsm_mod.ccsm_destroy_component_by_name(self.ccsm_fd, self.ccsmTest_thread_name)
+		
+		ccsm_mod.ccsm_destroy_set(self.ccsm_fd, self.ccsm_set_name)
+		ccsm_mod.ccsm_destroy_set(self.ccsm_fd, self.ccsm_set_name1)
+		ccsm_mod.ccsm_destroy_set(self.ccsm_fd, self.ccsm_set_name2)
+		ccsm_mod.ccsm_destroy_set(self.ccsm_fd, self.ccsm_set_name3)
+
+	def main(self):
+		
+		parser = optparse.OptionParser()
+		parser.disable_interspersed_args()
+
+		(ccsmTestCommand, ccsmTestOptions) = parser.parse_args()
+
+		self.pid = os.getpid()
+		self.ccsm_set_name = "ccsmTestOne_" + `self.pid`
+		self.ccsmTest_thread_name = "CCSM TEST Thread_" + `self.pid`
+		self.ccsm_set_name1 = "ccsmTestTwo_" + `self.pid`
+		self.ccsm_set_name2 = "ccsmTestThree_" + `self.pid`
+		self.ccsm_set_name3 = "ccsmTestFour_" + `self.pid`
+		self.ccsm_fd = ccsm_mod.ccsm_open()
+
+		print "Option Given .....", ccsmTestOptions[0]
+		if ccsmTestOptions[0]=="four":
+			print "In four option...\n"
+			self.four()
+		elif ccsmTestOptions[0]=="single":
+			print "In single Option....\n"
+			self.single()
+		
+		print "Starting the infinite Loop......\n"
+		while(True):
+			print "Going to Sleep for 30 Sec.......\n"
+			time.sleep(30)
+
+if __name__ == "__main__":
+	ccsmTestOb = ccsmTest()
+	ccsmTestOb.main()

@@ -1,0 +1,138 @@
+@define VIDSERV "10.0.11.2"
+@define TRACKER "10.0.12.3"
+@define DISPLAY "10.0.12.2"
+
+
+<netspec>
+incoming_dir = "/tmp/rawdata"
+scoreboard = [
+
+	{
+		clksync = "sync"
+	}
+	{
+		dski = "start"
+	}
+	{
+		camserv = "listen"
+		vidserv = "listen"
+		display = "connect"
+		watcher = "connect"
+	}
+	{
+		vidserv = "capture"
+	}
+	{
+		dski = "cleanup"
+		clksync = "cleanup"
+		camserv = "cleanup"
+		vidserv = "cleanup"
+		watcher = "cleanup"
+		display = "cleanup"
+	}
+]
+
+daemons = {
+	dski = {
+		host = [cthulhu, testbed50, testbed51]
+		command = "dskid"
+		phases = {
+			start = {
+				params = {
+					dski = {
+						output_base = "/tmp/dski"
+						buffer_size = 500000,
+						buffer_count = 50,
+						name = "dski_andrew",
+						duration = 0
+					}
+					dski_enabled = {
+						NETWORK_DRIVER_FAM = [
+							EVENT_E100_RX,
+							EVENT_E100_TX
+						]
+						#IP_LAYER_FAM = true,
+						#SOCKET_FAM = true,
+						#TCP_LAYER_FAM = true,
+						#NET_DEVICE_LAYER_FAM = true,
+						#NETWORK_DRIVER_FAM = true
+						#TC_LAYER_FAM = true
+						#E100 = true
+					}
+				}
+			}
+		}
+	}
+	camserv = {
+		host = cthulhu
+		command = "camserv"
+		phases = {
+			listen = {
+				params = {
+					camera_type = vcc4
+				}
+				sleep_after = 3
+
+			}
+		}
+	}
+	vidserv = {
+		host = cthulhu
+		command = "vidserv"
+		phases = {
+			capture = {
+				params = {
+					video_input = 1
+					video_device = "/dev/video0"
+					video_xsize = 160
+					video_ysize = 120
+				}
+				sleep_after = 300
+			}
+		}
+	}
+	watcher = {
+		host = testbed50
+		command = "kuim_watcher"
+		phases = {
+			connect = {
+				params = {
+					radius = 16
+					colorx = 80
+					colory = 60
+					video_host = $(VIDSERV)
+					camera_host = $(VIDSERV)
+					threshold = 0.20
+					frequency = 70
+					color_thresh = 15
+					twitch = 10000
+				}
+			}
+		}
+	}
+	display = {
+		host = testbed51
+		command = "kuim_display"
+		phases = {
+			connect = {
+				params = {
+					video_host = $(TRACKER)
+				}
+			}
+		}
+	}
+	clksync = {
+		host = [cthulhu, testbed50, testbed51]
+		command = "synchronize"
+		phases = {
+			sync = {
+				params = {
+					timeserver = "testbed60"
+				}
+			}
+		}
+	}
+}
+
+
+						

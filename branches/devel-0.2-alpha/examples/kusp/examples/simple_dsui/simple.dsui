@@ -1,0 +1,31 @@
+<dsui>
+output_file = "/tmp/simple.dsui.bin"
+
+
+<dsui_enabled>
+FUNC_MAIN = [
+	CALLING_FUNC_LOOP
+	IN_MAIN_FUNC
+	CALLING_FUNC_DISPLAY
+	CALLING_FUNC_COSINE
+]
+FUNC_COSINE = [
+	EXIT
+	ENTER
+]
+FUNC_LOOP = [
+	SUM(upperbound=1, lowerbound=0, buckets=10, tune_amount=10)
+	DSUI_OVERHEAD
+	ITER_COUNT
+	ITER_TWO
+	ITER_ONE
+	EXIT
+	ENTER
+]
+FUNC_BIGBUF = [
+	LARGE_DATA
+]
+FUNC_DISPLAY = [
+	EXIT
+	ENTER
+]

@@ -1,0 +1,82 @@
+<expt1>
+scoreboard = [
+	{clk1="init", clk2="init", ntp="init", cam="init", watcher="init"},
+	{clk1="connect", clk2="connect"}
+	{clk1="sync",clk2="sync"}
+	{watcher="connect"},
+	{clk1="cleanup", clk2="cleanup", ntp="cleanup", cam="cleanup", watcher="cleanup"}
+]
+daemons = {
+	clk1 = {
+		bin = "synchronize"
+		host = "cthulhu",
+		phases = {
+			connect = {
+				params = { host = "testbed60"}
+				timeout = 10
+			}
+			init = {
+				files = {
+					send = {"clksync.dsui" = "clksync.dsui"}
+				}
+			}
+			cleanup = {
+				files = {
+					recv = {"/tmp/clksync.dsui" = "clk1.clksync.dsui"}
+				}
+			}
+		}
+	)
+	clk2 = {
+		bin = "synchronize"
+		host = "testbed55",
+		phases = {
+			connect = { host = "testbed60"}
+		}
+		files = {
+			init = {
+				send_src = "clksync.dsui"
+				send_dest = "clksync.dsui"
+			}
+			cleanup = {
+				recv_dest = "clk1.clksync.dsui"
+			}
+		}
+	)
+	ntp = {
+		bin = "ku_ntpd"
+		host = "testbed60"
+	)
+	cam = {
+		bin = "camserv"
+		host = "cthulhu"
+		files = {
+			cleanup = {
+				recv_dest = "camserv.dsui"
+			}
+		}
+		phases = {
+			init = {
+				device = "vcc3"
+				video-device = "/dev/video0"
+				video-input = 1
+			}
+		}
+	)
+	watcher = {
+		bin = "kuim_watcher"
+		host = "testbed55"
+		phases = {
+			init = {
+				enable-dispaly = false
+			}
+			connect = {
+				video-host = "cthulhu"
+			}
+		}
+	)
+}
+
+
+
+

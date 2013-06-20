@@ -1,0 +1,209 @@
+#log# Automatic Logger file. *** THIS MUST BE THE FIRST LINE ***
+#log# DO NOT CHANGE THIS LINE OR THE TWO BELOW
+#log# opts = Struct({'__allownew': True,
+ 'c': 'from ipym_alice import *; ipym_initialize(recompile=False); hello(); ipym_cleanup()',
+ 'logfile': 'ipymake_log.txt',
+ 'profile': 'sh'})
+#log# args = []
+#log# It is safe to make manual edits below here.
+#log#-----------------------------------------------------------------------
+IPYM_INSTALL_PREFIX = '~/tmp'
+IPYM_BINARY_PREFIX = '/bin'
+IPYM_LIBRARY_PREFIX = '/lib'
+IPYM_INCLUDE_PREFIX = '/include'
+IPYM_SHARE_PREFIX = '/share'
+IPYM_BINARY_DIR = './build'
+class DynamicPrefixString:
+    def __init__(self, static_suffix):
+        self._static_suffix = static_suffix
+    def __str__(self):
+        return IPYM_INSTALL_PREFIX + self._static_suffix
+IPYM_BINARY_INSTALL_PREFIX = DynamicPrefixString(IPYM_BINARY_PREFIX)
+IPYM_LIBRARY_INSTALL_PREFIX = DynamicPrefixString(IPYM_LIBRARY_PREFIX)
+IPYM_INCLUDE_INSTALL_PREFIX = DynamicPrefixString(IPYM_INCLUDE_PREFIX)
+IPYM_SHARE_INSTALL_PREFIX = DynamicPrefixString(IPYM_SHARE_PREFIX)
+IPYM_COMMAND_ARGS = '' 
+print 'initializing works'
+ldir = os.getcwd()+'/libkusp/'
+libkusp_files = ['configfile.c',
+                 'linkedlist.c',
+                 'hashtable.c',
+                 'hashtable_types.c',
+                 'misc.c',
+                 'kusp_common.c',
+                 'rdwr.c',
+                 'vector.c',
+                 'exception.c',
+                 'configverify.c',
+                 'net.c',
+                 'kusp_private.h'
+                 ]
+libkusp_files = map(lambda s: ldir+s, libkusp_files)
+libkusp_files = filter(lambda s: s.endswith('.c'), libkusp_files)
+compile_shared_library('kusp', include_dirs=['libkusp'], *libkusp_files)
+mkdir -p $IPYM_BINARY_DIR
+retval = _ip.magic("sc -l =gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/configfile.c   -Ilibkusp -o  $IPYM_BINARY_DIR/configfile.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/configfile.c   -Ilibkusp -o  $IPYM_BINARY_DIR/configfile.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/linkedlist.c   -Ilibkusp -o  $IPYM_BINARY_DIR/linkedlist.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/linkedlist.c   -Ilibkusp -o  $IPYM_BINARY_DIR/linkedlist.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/hashtable.c   -Ilibkusp -o  $IPYM_BINARY_DIR/hashtable.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/hashtable.c   -Ilibkusp -o  $IPYM_BINARY_DIR/hashtable.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/hashtable_types.c   -Ilibkusp -o  $IPYM_BINARY_DIR/hashtable_types.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/hashtable_types.c   -Ilibkusp -o  $IPYM_BINARY_DIR/hashtable_types.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/misc.c   -Ilibkusp -o  $IPYM_BINARY_DIR/misc.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/misc.c   -Ilibkusp -o  $IPYM_BINARY_DIR/misc.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/kusp_common.c   -Ilibkusp -o  $IPYM_BINARY_DIR/kusp_common.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/kusp_common.c   -Ilibkusp -o  $IPYM_BINARY_DIR/kusp_common.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/rdwr.c   -Ilibkusp -o  $IPYM_BINARY_DIR/rdwr.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/rdwr.c   -Ilibkusp -o  $IPYM_BINARY_DIR/rdwr.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/vector.c   -Ilibkusp -o  $IPYM_BINARY_DIR/vector.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/vector.c   -Ilibkusp -o  $IPYM_BINARY_DIR/vector.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/exception.c   -Ilibkusp -o  $IPYM_BINARY_DIR/exception.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/exception.c   -Ilibkusp -o  $IPYM_BINARY_DIR/exception.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/configverify.c   -Ilibkusp -o  $IPYM_BINARY_DIR/configverify.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/configverify.c   -Ilibkusp -o  $IPYM_BINARY_DIR/configverify.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/net.c   -Ilibkusp -o  $IPYM_BINARY_DIR/net.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/net.c   -Ilibkusp -o  $IPYM_BINARY_DIR/net.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =gcc  -shared -Wl,-soname,libkusp.so -o $IPYM_BINARY_DIR/libkusp.so  $IPYM_BINARY_DIR/configfile.o  $IPYM_BINARY_DIR/linkedlist.o  $IPYM_BINARY_DIR/hashtable.o  $IPYM_BINARY_DIR/hashtable_types.o  $IPYM_BINARY_DIR/misc.o  $IPYM_BINARY_DIR/kusp_common.o  $IPYM_BINARY_DIR/rdwr.o  $IPYM_BINARY_DIR/vector.o  $IPYM_BINARY_DIR/exception.o  $IPYM_BINARY_DIR/configverify.o  $IPYM_BINARY_DIR/net.o -lc ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -shared -Wl,-soname,libkusp.so -o $IPYM_BINARY_DIR/libkusp.so  $IPYM_BINARY_DIR/configfile.o  $IPYM_BINARY_DIR/linkedlist.o  $IPYM_BINARY_DIR/hashtable.o  $IPYM_BINARY_DIR/hashtable_types.o  $IPYM_BINARY_DIR/misc.o  $IPYM_BINARY_DIR/kusp_common.o  $IPYM_BINARY_DIR/rdwr.o  $IPYM_BINARY_DIR/vector.o  $IPYM_BINARY_DIR/exception.o  $IPYM_BINARY_DIR/configverify.o  $IPYM_BINARY_DIR/net.o -lc
+RETURN VALUE: %s"""%retval[-1])
+compile_static_library('kusp', include_dirs=['libkusp'], *libkusp_files)
+mkdir -p $IPYM_BINARY_DIR
+retval = _ip.magic("sc -l =gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/configfile.c   -Ilibkusp -o  $IPYM_BINARY_DIR/configfile.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/configfile.c   -Ilibkusp -o  $IPYM_BINARY_DIR/configfile.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/linkedlist.c   -Ilibkusp -o  $IPYM_BINARY_DIR/linkedlist.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/linkedlist.c   -Ilibkusp -o  $IPYM_BINARY_DIR/linkedlist.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/hashtable.c   -Ilibkusp -o  $IPYM_BINARY_DIR/hashtable.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/hashtable.c   -Ilibkusp -o  $IPYM_BINARY_DIR/hashtable.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/hashtable_types.c   -Ilibkusp -o  $IPYM_BINARY_DIR/hashtable_types.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/hashtable_types.c   -Ilibkusp -o  $IPYM_BINARY_DIR/hashtable_types.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/misc.c   -Ilibkusp -o  $IPYM_BINARY_DIR/misc.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/misc.c   -Ilibkusp -o  $IPYM_BINARY_DIR/misc.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/kusp_common.c   -Ilibkusp -o  $IPYM_BINARY_DIR/kusp_common.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/kusp_common.c   -Ilibkusp -o  $IPYM_BINARY_DIR/kusp_common.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/rdwr.c   -Ilibkusp -o  $IPYM_BINARY_DIR/rdwr.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/rdwr.c   -Ilibkusp -o  $IPYM_BINARY_DIR/rdwr.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/vector.c   -Ilibkusp -o  $IPYM_BINARY_DIR/vector.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/vector.c   -Ilibkusp -o  $IPYM_BINARY_DIR/vector.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/exception.c   -Ilibkusp -o  $IPYM_BINARY_DIR/exception.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/exception.c   -Ilibkusp -o  $IPYM_BINARY_DIR/exception.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/configverify.c   -Ilibkusp -o  $IPYM_BINARY_DIR/configverify.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/configverify.c   -Ilibkusp -o  $IPYM_BINARY_DIR/configverify.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/net.c   -Ilibkusp -o  $IPYM_BINARY_DIR/net.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: gcc  -g -c -Wall -fPIC /home/hhicks/workspace/ipymake/examples/prototypes/wonderland/libkusp/net.c   -Ilibkusp -o  $IPYM_BINARY_DIR/net.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =ar rcs $IPYM_BINARY_DIR/libkusp.a  $IPYM_BINARY_DIR/configfile.o  $IPYM_BINARY_DIR/linkedlist.o  $IPYM_BINARY_DIR/hashtable.o  $IPYM_BINARY_DIR/hashtable_types.o  $IPYM_BINARY_DIR/misc.o  $IPYM_BINARY_DIR/kusp_common.o  $IPYM_BINARY_DIR/rdwr.o  $IPYM_BINARY_DIR/vector.o  $IPYM_BINARY_DIR/exception.o  $IPYM_BINARY_DIR/configverify.o  $IPYM_BINARY_DIR/net.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: ar rcs $IPYM_BINARY_DIR/libkusp.a  $IPYM_BINARY_DIR/configfile.o  $IPYM_BINARY_DIR/linkedlist.o  $IPYM_BINARY_DIR/hashtable.o  $IPYM_BINARY_DIR/hashtable_types.o  $IPYM_BINARY_DIR/misc.o  $IPYM_BINARY_DIR/kusp_common.o  $IPYM_BINARY_DIR/rdwr.o  $IPYM_BINARY_DIR/vector.o  $IPYM_BINARY_DIR/exception.o  $IPYM_BINARY_DIR/configverify.o  $IPYM_BINARY_DIR/net.o
+RETURN VALUE: %s"""%retval[-1])
+compile_executable('helloworld', 'libkusp/hello.cpp',potatoes='yes, please', ant_farm="maybe", rutabagas='25kg')
+mkdir -p $IPYM_BINARY_DIR
+retval = _ip.magic("sc -l =g++  -g -c -Wall -fPIC libkusp/hello.cpp   -o  $IPYM_BINARY_DIR/hello.o ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: g++  -g -c -Wall -fPIC libkusp/hello.cpp   -o  $IPYM_BINARY_DIR/hello.o
+RETURN VALUE: %s"""%retval[-1])
+retval = _ip.magic("sc -l =g++  $IPYM_BINARY_DIR/hello.o -L./build  -o $IPYM_BINARY_DIR/helloworld ; echo $?")
+if retval[-1] != '0':
+    raise RuntimeError("""Bad exit value
+TARGET:  
+COMMAND: g++  $IPYM_BINARY_DIR/hello.o -L./build  -o $IPYM_BINARY_DIR/helloworld
+RETURN VALUE: %s"""%retval[-1])
+#for bin in  IPYM_COMPILED_BINARIES:
+#    print bin
+#for fi in  IPYM_INSTALL_FILES:
+#    print fi
+print 'cleanup works'

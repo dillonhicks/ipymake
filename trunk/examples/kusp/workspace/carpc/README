@@ -1,0 +1,7 @@
+Custom RPMs for the live CD must be placed in a local repository
+which is referred to in the kickstart file.
+
+A local repository can be created by creating a directory, placing
+RPMs in the directory and then doing:
+
+createrepo <directory>

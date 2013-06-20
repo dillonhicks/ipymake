@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# Optional: Turn on ftrace to see the functions being executed.
+sudo sysctl kernel.ftrace_enabled=1
+
+sudo touch /debug/tracing/trace
+
+# Enable a bunch of functions at once.
+echo 'hrtimer_*' > /debug/tracing/set_ftrace_filter
+
+cat /debug/tracing/set_ftrace_filter
+
+# Specify what tracer we want.
+echo function > /debug/tracing/current_tracer
+
+# Start tracing.
+echo 1 > /debug/tracing/tracing_enabled
+
+# Do something.
+usleep 1
+
+# Stop tracing.
+echo 0 > /debug/tracing/tracing_enabled
+
+# View the trace.
+cat /debug/tracing/trace | head

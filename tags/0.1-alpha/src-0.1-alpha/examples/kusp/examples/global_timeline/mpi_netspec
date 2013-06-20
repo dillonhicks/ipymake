@@ -1,0 +1,74 @@
+#!/usr/bin/python
+
+from optparse import OptionParser, OptionGroup
+from netspec import daemon
+#from pykusp import configfile
+import pykusp.configutility as configfile
+import os
+import sys
+
+mpi_cspec = """
+<root>
+types = ["dictionary"]
+doc = "mpi_netspec exec config file"
+required = false
+dictdef = {
+	"iterations" = {
+		"var" = 0
+		"doc" = "Number of times to run mpi program"
+		"required" = false
+		"default" = 1
+		"types" = ["integer"]
+	}
+	"mpiargs" = {
+		"var" = 1
+		"doc" = "Arguments to mpirun"
+		"required" = false
+		"types" = ["string"]
+	}
+	"dsuifile" = {
+		"var" = 2
+		"doc" = "dsui output file"
+		"required" = false
+		"types" = ["string"]
+	}
+}
+""";
+
+# Main mpirun execution phase for master node
+def exec_phase(cfg):
+	print "Starting exec phase"
+	sys.stdout.flush()
+
+	# Launch the mpi program "iterations" times
+	#os.spawnvp(os.P_WAIT, "/usr/bin/mpirun", cfg["mpiargs"])
+	os.system(cfg["mpiargs"])
+	
+	print "exec phase complete"
+
+# Cleanup phase for all nodes, whether they be master or slave
+def cleanup_phase(cfg):
+	dsuifile = cfg.get("dsuifile", "")
+	daemon.ns_acknowledge(daemon.NS_OK_EXIT, filename=dsuifile)
+
+def main():
+        usage = "usage: %prog [options] arg"
+        version = "%prog 1.0"
+        parser = OptionParser(usage=usage, version=version)
+	# Netspec file descriptor - required
+	parser.add_option("-n", "--netspec", type="int", metavar="INT",
+                          help="netspec file descriptor")
+	(options, args) = parser.parse_args()
+	if not options.netspec:
+		parser.error("Must pass Netspec file descriptor")
+	netspec_fd = options.netspec
+
+	# Set our netspec phases and handlers
+	daemon.ns_set_execute("exec", None, exec_phase)
+	daemon.ns_set_execute("cleanup", None, cleanup_phase)
+
+	# Start netspec - this will pause us until we get a phase begin message
+	daemon.ns_begin(netspec_fd)
+
+if __name__ == "__main__":
+        main()

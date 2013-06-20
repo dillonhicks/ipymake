@@ -1,0 +1,49 @@
+<main>
+filters = {
+	dski1 = [
+		head.input(
+			file = ["data/*_dski/chan1/cpu0.bin"]
+		)
+
+		utility.timestamp()
+	]
+
+	dski2 = [
+		head.input(
+			file = ["data/*_dski/chan1/cpu1.bin"]
+		)
+
+		utility.timestamp()
+	]
+
+	dsui2 = [
+		head.input(
+			file = ["data/*_traced.dsui.bin"]
+		)
+
+		utility.timestamp()
+	]
+
+
+	f1 = [
+		head.input(
+			conn = [dski1, dski2, dsui2]
+			namespace = {
+				OCA = {
+					entities = {
+						ACTIONS = event(
+							desc = "oca action event"
+						)
+					}
+				}
+			}
+		)
+#		utility.narrate(print_extra_data = true)
+		discovery_pre_process.OCA_event_creator(outfile = oca_events)
+#		javaFilter.Javafilter()
+#		nx1.discovery_graph(
+#			print_level = 0,
+#			outfile = "nx"
+#		)
+	]
+}

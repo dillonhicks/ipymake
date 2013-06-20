@@ -1,0 +1,33 @@
+<dski>
+output_base = "test.dski.bin"
+child = "./test --dsui-output test.dsui.bin"
+
+<channels>
+chan1 = {
+	buffer_size = 500000,
+	buffer_count = 50
+}
+
+<datastreams>
+dski = {
+	channel = chan1
+	filters = []
+#	filters = [
+#		task( 
+#			ccsm_name = "trace_me"
+#		)
+#	]
+#	child_alias = "trace-me"
+	enabled = {
+		EXIT = [
+			 DO_EXIT_START,
+			 DO_EXIT,
+			 DO_EXIT_END
+		]
+		GSCHED = [
+		       EXIT_START,
+		       EXIT_END,
+		       EXIT_REMOVE
+		]		
+	}
+}

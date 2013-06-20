@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Optional: Turn on ftrace to see the functions being executed.
+sudo sysctl kernel.ftrace_enabled=1
+
+# Disable stacktrace because it generates a ton of data. 
+echo nostacktrace > /debug/tracing/trace_options
+
+sudo touch /debug/tracing/trace
+
+# Specify what tracer we want.
+echo function > /debug/tracing/current_tracer
+
+# Start tracing.
+echo 1 > /debug/tracing/tracing_enabled
+
+# Do something.
+usleep 1
+
+# Stop tracing.
+echo 0 > /debug/tracing/tracing_enabled
+
+# View the trace.
+cat /debug/tracing/trace | head

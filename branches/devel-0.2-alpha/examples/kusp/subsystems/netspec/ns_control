@@ -1,0 +1,527 @@
+#!/usr/bin/python
+
+from paramiko import *
+from netspec import protocol
+import socket
+import select
+from pykusp import configutility
+import getopt
+import os
+import sys
+import copy
+import pprint
+import time
+
+pp = pprint.PrettyPrinter()
+
+result_codes = {
+	0 : "OK",
+	1 : "WARNING",
+	2 : "OK_COMPLETE",
+	3 : "ERROR",
+	4 : "DIED",
+}
+
+# this code is messy and needs to be rewritten.
+# it is a proof-of-concept and doesn't handle error conditions
+# nearly as well as I would like
+
+
+config_spec = {
+'root': {
+	'doc': 'NETSPEC config file', 
+	'types': 'dictionary', 
+	'opendictdef': {
+		'types' : 'dictionary',
+		'dictdef' : {
+			'daemons': {
+				'types': 'dictionary', 
+				'opendictdef': {
+					'types' : 'dictionary',
+					'dictdef' : {
+						'command': {
+							'required': True, 
+							'types': 'string'
+						}, 
+						'host': {'required': True, 
+							'types': 'list',
+							'listdef': {
+								'types':'string'
+							}
+						}, 
+						'phases': {
+							'types': 'dictionary', 
+							'opendictdef': {
+								'types' : 'dictionary',
+								'dictdef' : {
+									'files': {
+										'default': {}, 
+										'types': 'dictionary'
+									},
+									'pause_before': {
+										'default' : False,
+										'types': 'boolean'
+									},
+									'pause_after': {
+										'default' : False,
+										'types': 'boolean'
+									},
+									'sleep_after': {
+										'default': 0,
+										'types' : 'integer',
+									},
+									'params': {
+										'default': {}, 
+										'types': 'dictionary'
+									}, 
+									'timeout': {
+										'default': 60, 
+										'types': 'integer'
+									}
+								}
+							}
+						}, 
+						'workingdir': {
+							'default': '.', 
+							'types': 'string'
+						}, 
+						'port': {
+							'default': 14100, 
+							'types': 'integer'
+						}
+					}
+				}
+			}, 
+			'scoreboard': {
+				'listdef': {
+					'types': 'dictionary',
+					'opendictdef' : {
+						'types' : 'string'
+					}
+				},
+				'types': 'list'
+			},
+			'incoming_dir': {
+				'types' : 'string',
+				'default' : '.'
+			},
+			'interactive': {
+				'types' : 'boolean',
+				'default' : False
+			},
+		}
+	}
+}
+}
+
+
+
+# config_spec = configfile.check_spec(config_spec)
+
+xinetd = False
+xinet_port = 14101
+xinet_hosts = []
+xinet_conns = {}
+
+class XinetConnection:
+	def __init__(self, name):
+		self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.host = name
+		# Connect to xinetd, which will spawn netspecd
+		print "Connecting to host", self.host, "port", xinet_port
+		self.sock.connect((self.host, xinet_port))
+
+	def __del__(self):
+		self.sock.close()
+
+		
+class NetspecConnection:
+	def __init__(self, name, config, inc_dir):
+		self.client = None
+		self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+		self.host = config["host"]
+		self.port = config["port"]
+		self.args = config["command"].split(" ")
+		self.command = self.args[0]
+
+		self.phases = config["phases"]
+		self.workingdir = config["workingdir"]
+
+		# Now connect to netspecd
+		print "Connecting to host", self.host, "port", self.port
+		self.sock.connect((self.host, self.port))
+
+		packet = {
+			"workingdir" : self.workingdir,
+			"command" : self.command,
+			"args" : self.args,
+		}
+
+		self.wfile = self.sock.makefile('w')
+		self.rfile = self.sock.makefile('r')
+
+		protocol.write_config(self.wfile, packet)
+
+		z = protocol.read_config(self.rfile)
+		self.log_filename = z["logfile"]
+		self.pid = z["pid"]
+
+		self.name = name
+		self.filedir = os.path.join(inc_dir, name)
+		try:
+			os.makedirs(self.filedir)
+		except Exception, ex:
+			print "WARNING", ex
+
+	def __del__(self):
+		self.sock.close()
+		self.close_sftp()
+
+
+	def open_sftp(self):
+		self.client = SSHClient()
+		self.client.load_system_host_keys()
+		self.client.set_missing_host_key_policy(AutoAddPolicy)
+		self.client.connect(self.host)
+		self.sftp = self.client.open_sftp()
+	
+
+	def close_sftp(self):
+		if self.client:
+			self.client.close()
+		self.client = None
+
+
+	def send_file(self, local_name, remote_name=None):
+
+		if not remote_name:
+			remote_name = local_name
+		
+		try:
+			self.open_sftp()
+			self.sftp.put(local_name, remote_name)
+			self.close_sftp()
+		except Exception, e:
+			print "FAILED TO SEND FILE", local_name, e
+
+	def get_file(self, remote_name, local_name=None):
+
+		if not local_name:
+			local_name = remote_name
+		# strip directory information
+		local_name = os.path.basename(local_name)
+		local_name = os.path.join(self.filedir, local_name)
+		print "Receiving remote file",self.host+":"+remote_name,"as",local_name
+		try:
+			self.open_sftp()
+			self.sftp.get(remote_name, local_name)
+			self.close_sftp()
+		except Exception, e:
+			print "FAILED TO GET FILE", remote_name, e
+
+	def get_log_file(self):
+		local_filename = self.name + ".log"
+		self.get_file(self.log_filename, local_filename)
+
+	def get_name(self):
+		return self.name
+
+	def fileno(self):
+		return self.sock.fileno()
+
+	def terminate(self):
+		packet = {
+			"workingdir" : ".",
+			"command" : "kill",
+			"args" : ["kill","-9",`self.pid`]
+		}
+
+		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		s.connect((self.host, self.port))
+		
+		wfile = s.makefile('w')
+		protocol.write_config(wfile, packet)
+		s.close()
+
+
+	def send_phase(self, name):
+		if name in self.phases:
+			phase = self.phases[name]
+			params = phase["params"]
+		else:
+			params = {}
+
+
+		packet = {
+			"phase_name" : name,
+			"params" : params,
+		}
+
+		protocol.write_config(self.wfile, packet)
+	
+	def recv_phase_ack(self):
+		return protocol.read_config(self.rfile)
+
+
+def create_connections(daemondict, inc_dir):
+	global xinet_conns
+	conn_dict = {}
+
+	# Launch netspecd via xinetd on each host
+	if xinetd:
+		for host in xinet_hosts:
+			try:
+				xinet_conns[host] = XinetConnection(host)
+			except socket.error, ex:
+				print "FAILED to connect to xinetd on", host, ex
+				raise
+			time.sleep(1)
+
+	for k,v in daemondict.items():
+		try:
+			c = NetspecConnection(k, v, inc_dir)
+		except socket.error, ex:
+			print "FAILED to connect to ", v["host"], ex
+			raise
+		conn_dict[k] = c
+		time.sleep(1)
+	return conn_dict
+
+
+
+def execute_phase(connections, phasedict):
+
+	pause_before = False
+	pause_after = False
+	sleep_after = 0
+	timeout = 30
+	print "############### PHASE #################"
+	conns = [i for i in connections.values() if i.get_name() in phasedict]
+	
+	for conn in conns:
+		phasename = phasedict[conn.get_name()]
+		try:
+			pause_before = pause_before or conn.phases[phasename]["pause_before"]
+			pause_after = pause_after or conn.phases[phasename]["pause_after"]
+			sleep_after = max(sleep_after, conn.phases[phasename]["sleep_after"])
+			timeout = max(timeout, conn.phases[phasename]["timeout"])
+		except KeyError:
+			pass
+
+	
+	if pause_before:
+		raw_input("Hit any key to execute the phase")
+
+
+	# send out all the phase commands
+	while (conns):
+		iwtd, owtd, ewtd = select.select([], conns, [], 10)
+		if not owtd:
+			print "out select failed"
+			continue
+		for c in owtd:
+			conns.remove(c)
+			print "SENDING COMMAND TO", c.get_name()
+			phase_name = phasedict[c.get_name()]
+			try:
+				c.send_phase(phase_name)
+			except socket.error, ex:
+				print "ERROR", ex
+
+	
+	# await replies from everyone
+	acks = {}
+	conns = [i for i in connections.values() if i.get_name() in phasedict]
+	print "Awaiting replies, timeout in",timeout,"seconds."
+
+	elapsed = time.time()
+
+	while (conns):
+		try:
+			iwtd, owtd, ewtd = select.select(conns, [], [], timeout)
+		except KeyboardInterrupt:
+			iwtd = None
+
+		if not iwtd:
+			print "in select failed"
+			# terminate processes?
+			for c in conns:
+				c.get_log_file()
+				c.terminate()
+
+			break
+
+		for c in iwtd:
+			conns.remove(c)
+			print "GETTING ACK FROM",c.get_name()
+			try:
+				ack = c.recv_phase_ack()
+			except Exception, ex:
+				print "ERROR", ex
+				ack = {'error' : 3}
+			acks[c.get_name()] = ack
+			print "ACK COMPLETE"
+
+	elapsed = time.time() - elapsed
+	print "Phase execution time was",elapsed
+
+	if pause_after:
+		raw_input("Phase is done; hit a key")
+	if sleep_after:
+		print 'Sleeping for',sleep_after,'seconds'
+		try:
+			time.sleep(sleep_after)
+		except KeyboardInterrupt:
+			pass
+
+	
+	return acks
+
+def redo_config(config):
+	global xinet_hosts, xinetd
+	new_dd = {}
+	replacements = {}
+	for daemon_name, daemon_dict in config["daemons"].items():
+		replacements[daemon_name] = []
+		for hostname in daemon_dict["host"]:
+			# Add hostname to xinetd list
+			if xinetd:
+				xinet_hosts.append(hostname)
+			dc = copy.copy(daemon_dict)
+			dc["host"] = hostname
+			new_dd[hostname+"_"+daemon_name] = dc
+			replacements[daemon_name].append(hostname+"_"+daemon_name)
+
+	# Eliminate duplicate hostnames
+	if xinetd:
+		xinet_hosts = set(xinet_hosts)
+
+	new_scoreboard = []
+	for phase in config["scoreboard"]:
+		new_phase = {}
+		for phase_name, phase_action in phase.items():
+			for new_name in replacements[phase_name]:
+				new_phase[new_name] = phase_action
+		new_scoreboard.append(new_phase)
+	
+	config["daemons"] = new_dd
+	config["scoreboard"] = new_scoreboard
+
+
+def run_experiment(config):
+	global xinet_hosts, xinet_conns
+
+	redo_config(config)
+
+	pp.pprint(config)
+
+	scoreboard = config["scoreboard"]
+	daemons = config["daemons"]
+	inc_dir = config["incoming_dir"]
+
+	try:
+		conns = create_connections(daemons, inc_dir)
+	except socket.error, ex:
+		print ex
+		return
+
+	for phase in scoreboard:
+		if config["interactive"]:
+			raw_input("Hit any key to continue")
+
+		acks = execute_phase(conns, phase)
+	
+
+		for n, ack in acks.items():
+			print "*** Processing acknowledgement from", n
+			c = conns[n]
+
+			if "files" in ack:
+				for file in ack["files"]:
+					c.get_file(file)
+
+			if "message" in ack:
+				print "MESSAGE FROM PROCESS",n,":",ack["message"]
+
+			if "config" in ack:
+				print "DATA STRUCTURE FROM PROCESS",n
+				print ack["config"]
+
+			if 'closed_pid' in ack:
+				print "PROCESS",ack["command"],"DIED WITH CODE",ack["exit_code"]
+			elif ack["error"] == 3:
+				print "PROCESS",n,"ERRORED OUT"
+			elif ack["error"] == 2:
+				print "PROCESS",n,"EXITED OK"
+			elif ack["error"] == 1:
+				print "PROCESS",n,"PHASE COMPLETE WITH WARNING"
+				continue
+			else:
+				print "PROCESS",n,"PHASE COMPLETE"
+				continue
+		
+			# if we get here the process is done, clean up
+			# try to get the process complete message from netspecd
+			iwtd, owtd, ewtd = select.select([conns[n]], [], [], 10)
+			if iwtd:
+				try:
+					z = iwtd[0].recv_phase_ack()
+					print "PID",z["closed_pid"],z["command"],"EXITED WITH CODE",z["exit_code"]
+				except Exception, e:
+					print "ERROR: Garbled response when trying to get process termination message"
+					z = None
+
+			c.get_log_file()
+			del conns[n]
+	if xinetd:
+		for host in xinet_hosts:
+			del xinet_conns[host]
+			
+
+def usage():
+	print """
+ns_control <options> <experiment names>
+
+-h | --help			Print this message
+-c | --config <filename>	Read experiment definitions from a file
+-x | --xinetd			Use xinetd on clients
+"""
+
+cfg = {}
+
+try:
+	opts, files = getopt.getopt(sys.argv[1:], "hc:x", ['help','config','xinetd'])
+except getopt.GetoptError:
+	usage()
+	sys.exit(2)
+
+for o, a in opts:
+	if o in ['-h', '--help']:
+		usage()
+		sys.exit()
+	if o in ['-c', '--config']:
+		try:
+			c = configutility.parseConfigFile(a)
+		except Exception, ex:
+			print "ERROR: could not parse file",a,":",ex
+			sys.exit(3)
+		cfg.update(c)
+	if o in ['-x', '--xinetd']:
+		xinetd = True
+
+if not cfg:
+	print "No configuration files supplied!"
+	usage()
+	sys.exit(1)
+
+if not files:
+	files = cfg.keys()
+
+
+for n in files:
+	print
+	print "RUNNING EXPERIMENT", n
+	run_experiment(c[n])
+
+print "NETSPEC run complete"

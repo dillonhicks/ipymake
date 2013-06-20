@@ -1,0 +1,142 @@
+#!/usr/bin/python
+
+from SocketServer import *
+from socket import *
+import sys
+import os
+#from pykusp import configfile
+import tempfile
+import struct
+import pickle
+from netspec import protocol
+import threading
+import mmap
+
+
+class ForkingTCPServer(ForkingMixIn, TCPServer):
+	def server_bind(self):
+		self.socket.setsockopt(SOL_SOCKET,SO_REUSEADDR,1)
+		TCPServer.server_bind(self)
+
+	def serve_forever(self):
+		sys.stdout.flush()
+		while mmap_data[1] == "0":
+			self.handle_request()
+		sys.stdout.flush()
+		
+
+class NetspecHandler(StreamRequestHandler):
+
+	def handle(self):
+		cfg = protocol.read_config(self.rfile)
+		print "netspecd got config",cfg
+		
+		command = cfg["command"]
+		args = cfg["args"]
+
+		if command == "kill":
+			# Just exit on kill
+			return
+
+		mmap_data[0] = str(int(mmap_data[0]) + 1)
+		print "New connection. Total count is", mmap_data[0]
+
+		logf, logname = tempfile.mkstemp(".netspec", command+".")
+
+		sys.stderr.flush()
+		sys.stdout.flush()
+
+		pid = os.fork()
+		if not pid:
+			os.dup2(logf, sys.stdout.fileno())
+			os.dup2(logf, sys.stderr.fileno())
+
+			# send the PID of the launched process back
+			print "netspecd:",command," child PID is", os.getpid()
+			print "netspecd:",command," log file is",logname
+			args.extend(["--netspec",`self.rfile.fileno()`])
+			print "netspecd: executing command line",args
+			print
+
+			sys.stdout.flush()
+
+			reply = {
+				"pid" : os.getpid(),
+				"logfile" : logname,
+				"command" : command,
+				"args" : args
+			}
+
+			protocol.write_config(self.wfile, reply)
+			
+			os.execvp(command, args)
+		else:
+			p, e = os.waitpid(pid, 0)
+			print "netspecd: child",command,"pid",p,"exited with status",e
+			mmap_data[0] = str(int(mmap_data[0]) - 1)
+			print "Closed connection. Total count is", mmap_data[0]
+			sys.stdout.flush()
+			os.close(logf)
+
+			reply = {
+				"closed_pid" : p,
+				"exit_code" : e,
+				"command" : command
+			}
+
+			protocol.write_config(self.wfile, reply)
+
+			if mmap_data[0] == "0":
+				mmap_data[1] = "1"
+
+				# Send kill message to local server
+                		packet = {
+                        		"workingdir" : ".",
+                        		"command" : "kill",
+                        		"args" : ["kill"]
+                		}
+
+                		s = socket(AF_INET, SOCK_STREAM)
+                		s.connect(('', 14100))
+
+                		wfile = s.makefile('w')
+                		protocol.write_config(wfile, packet)
+                		s.close()
+
+class ServerThread(threading.Thread):
+	def run(self):
+		self.server = ForkingTCPServer(('',14100), NetspecHandler)
+
+		try:
+			self.server.serve_forever()
+		finally:
+			self.server.socket.close()
+
+# Create an output file and attach stdout/stderr to it
+temp_fd, temp_name = tempfile.mkstemp(".output", "netspecd.")
+os.dup2(temp_fd, sys.stdout.fileno())
+os.dup2(temp_fd, sys.stderr.fileno())
+
+# Open an mmap'ed file to share variables between processes
+mmap_filename = "/tmp/.netspecd.mmap"
+mmap_file = open(mmap_filename, "w+")
+print >>mmap_file, "blah"
+mmap_file.flush()
+size = os.path.getsize(mmap_filename)
+mmap_data = mmap.mmap(mmap_file.fileno(), size)
+# Number of netspec connections. Once this resets to 0, we kill the server.
+# FIXME: This limits us to a maximum of 9 connections/phases right now.
+mmap_data[0] = "0"
+# Boolean controlling serve_forever behavior.
+mmap_data[1] = "0"
+
+print "Launching netspecd..."
+s = ServerThread()
+s.setDaemon(True)
+sys.stdout.flush()
+s.run()
+
+# Close output files
+mmap_file.close()
+os.remove(mmap_filename)
+os.close(temp_fd)

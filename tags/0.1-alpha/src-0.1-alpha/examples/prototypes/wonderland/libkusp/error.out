@@ -1,0 +1,17 @@
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/libkusp/exception.c: In function ‘_exceptionThrow_’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/libkusp/exception.c:29: warning: cast from pointer to integer of different size
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/libkusp/exception.c:35: warning: cast from pointer to integer of different size
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/libkusp/exception.c: In function ‘_exceptionThrowDebug_’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/libkusp/exception.c:43: warning: cast from pointer to integer of different size
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/libkusp/configverify.c: In function ‘verify_config_item’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/libkusp/configverify.c:227: warning: initialization makes pointer from integer without a cast
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/libkusp/configverify.c: In function ‘verify_config_opendict’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/libkusp/configverify.c:419: warning: initialization makes pointer from integer without a cast
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/libkusp/configverify.c: In function ‘verify_config_invocation’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/libkusp/configverify.c:449: warning: initialization makes pointer from integer without a cast
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/libkusp/configverify.c: In function ‘verify_config_list’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/libkusp/configverify.c:465: warning: initialization makes pointer from integer without a cast
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/libkusp/configverify.c: In function ‘verify_config_dictionary’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/libkusp/configverify.c:587: warning: initialization makes pointer from integer without a cast
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/libkusp/configverify.c: In function ‘verify_config_dict’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/libkusp/configverify.c:627: warning: initialization makes pointer from integer without a cast

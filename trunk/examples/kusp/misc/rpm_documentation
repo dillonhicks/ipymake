@@ -1,0 +1,237 @@
+This documentation is for Fedora 10/11.
+
+To build an RPM is relativley simple. The normal specification file is
+divided up into a header, prebuild, build, install and cleanup steps.
+
+ITTC Specific Practicalities
+==================================
+
+Due to the disk quotas on home directories at ITTC, most anyone
+building KUSP RPMS at ITTC will have to follow this workaround.
+
+Step 1): Make a directory in /projects/kurt with your username and
+     rpmbuild as a child *mkdir -p
+     /projects/kurt/<your-username>/rpmbuild*.
+
+
+Step 2): 'cd' into the created directory *cd
+     /projects/kurt/<your-username>/rpmbuild*.
+
+Step 3): Create all of the expected rpmbuild child directories *mkdir
+     BUILD BUILD_ROOT SOURCES SRPMS RPMS*.
+
+Step 4): Link your home directory to the new quota free rpmbuild
+directory *ln -s /projects/kurt/<your-username>/rpmbuild ~/rpmbuild*.
+
+Now everything should work, and you should not have disk quota issues.
+
+The RPM Specification File
+==================================
+
+Header (No defining macro)
+*********************************
+
+There is not a macro that defines the start of the header. The header
+should always be placed at the begining of the file before all of the
+other steps in the specification file. Normally, your rpm specification
+file should include all of the following fields.
+
+* Name:
+  The name of the software for which you are creating an rpm.
+* Version:
+  The version of the software for which you are making the rpm.
+* Release:
+  The RPM release number of the software for which you are makeing the
+  rpm.
+* Summary
+  A one line summary of the software. This is most often viewed
+  in the YUM package manager as the one liner below the name of
+  of the package in the package browser.
+* Group:
+  This should be one of the already defined package groups.
+* License:
+  The name of the software license.
+* URL:
+  Homepage URL for the software.
+* SourceXX:
+  This is the source tarball of each piece of the rpm. XX should be a
+  number starting at 0. This is useful if you are packaging more than
+  one piece of software, or dependent packages, in one release.
+* BuildRoot:
+  The location where all of built source package should be temporarily
+  installed before backaging the binary data into an rpm.  We use
+  *%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)* to
+  define a path under BUILD_ROOT that has the form
+  **<package-name>.<version>-<release>.<distrobution>.<architecture>**.
+  Also, by default the name of the rpm package is the name of the 
+  build root with the .rpm suffix.
+* BuildRequires:
+  A comma separated list of the packages that are needed in order
+  to build the software package from source.
+* Requires:
+  A comma separated list of the packages needed in order to have the
+  installed software function correctly.
+
+Description (%description)
+**********************************
+
+The description should immediately follow the header. The description
+is defined by the rpm macro %description, and the description should
+be placed under the %description macro.
+
+Example::
+
+	%description
+	
+	This is a description of my software.
+
+
+Preparation (%prep)
+**********************************
+
+The rpm macro %prep defines the preperation stage of building the
+software rpm. Here is where you can prepare the build directory by
+removing the previous builds and unpack the source tarball to
+~/rpmbuild/BUILD/<package-name>.
+
+Step 1) Remove the old build directory, if any::
+
+     rm -rf %{_builddir}/<name-of-software>
+
+The command 'rm -rf' is simply the normal bash remove command. The
+%{_builddir} is an rpmbuild variable that defaults to be
+*~/rpmbuild/BUILD*.
+
+Step 2) Unpack the source tarball::
+     
+     %setup -q -n <name-of-software>
+
+This uses the rpm macro %setup. This macro unpacks the source tarball
+with the name <name-of-software>.tar.gz into the directory
+~/rmpbuild/BUILD/<name-of-software>. The argument '-q' specifies to do
+it queitly, and '-n <name-of-software>' is to specify the name of the
+source tarball. If the -n argument is not explicitly specified then
+setup will look for a tarball with the naming convention
+<name-of-software>.<version>-<release>.tar.gz.
+
+
+Build (%build)
+**********************************
+
+Builds source code in build.
+
+Install (%install)
+**********************************
+
+Installs the built source code to the 
+
+Cleanup (%cleanup)
+**********************************
+
+Extra cleanup that is needed, perhaps make clean.
+
+Files  (%files)
+**********************************
+
+Files and directories to include in the rpm package.
+
+
+The KUSP RPM Specification File
+**********************************
+
+kusp.spec::
+	
+	Name:		kusp
+	Version:	0.9
+	Release:	5%{?dist}
+	Summary:	This is KUSP
+	
+	Group:		Development/Libraries	
+	License:	GPL
+	URL:		http://www.ittc.ku.edu/kusp
+	Source0:	kusp.tar.gz
+	BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
+	
+	BuildRequires:	cmake,flex,bison,swig,gcc,gcc-c++
+	Requires:	python-ply gnuplot
+	
+	%description
+	
+	KUSP User Level Software. This release includes the KUSP subsystems:
+	clksync, CCSM (Computation Component Set Manager), Data Streams,
+	Discovery, Group Scheduling, KUSP Common Components, and NetSpec. The
+	subsystems provide tools for interacting with the KUSP Kernel as will
+	as standalone application that can be used regardless if the KUSP
+	Kernel is installed.
+	
+	
+	%prep
+	rm -rf %{_builddir}/kusp
+	%setup -q -n kusp
+	
+	%build
+	mkdir build
+	cd build
+	cmake .. -DCMAKE_INSTALL_PREFIX=$RPM_BUILD_ROOT%{_prefix}  -DKERNELROOT=/usr/src/kernels/%(uname -r) -DIS_RPM_BUILD=1
+	make VERBOSE=1
+	
+	%install
+	rm -rf $RPM_BUILD_ROOT
+	cd build
+	%makeinstall
+	
+	
+	%files
+	%defattr(-,root,root,-)
+	%doc
+	%{_bindir}/*
+	%{_libdir}/*
+	%{_includedir}/*
+	%{_datadir}/*
+		
+
+
+
+Building the RPM
+=================================
+
+~/rpmbuild Directory
+**********************************
+
+By the new convention the rpmbuild directory is placed under the
+current user's home directory. In the child directories of rpmbuild is
+where all of the rpmbuild magic happens.
+
+* BUILD:
+  This is where the build of the source code takes place.
+
+* BUILD_ROOT:
+  The place to where the build files are placed during the install
+  step for binary RPMS.
+
+* SOURCES:
+  Tarball of the source code goes here.  
+
+* SRPMS:
+  Finalized source RPMS are placed here under
+  SRPMS/<architecture>/<package-name>.src.rpm
+
+* RPMS:
+  Finalized binary RPMS are placed here under
+  RPMS/<architecture>/<package-name>.rpm
+
+Installing the RPM
+=================================
+
+sudo rpm -Uvh /<path-to-rpm>/<name-of-package>.rpm
+
+or 
+
+sudo yum install-local ?
+
+References and Sources
+==================================
+
+* Hagmans Notes
+* Man page on rpmbuild
+* Fedora proect  documentation

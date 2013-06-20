@@ -1,0 +1,116 @@
+#!/usr/bin/env python
+
+import socket
+import struct
+import pickle
+import sys
+from netspec import protocol
+from pykusp import configfile
+import time
+
+HOST = 'localhost'
+PORT = 14100
+
+PACKET10 = {
+		"workingdir":".",
+		"command":"syscmd/ns_syscmd",
+		"args":["ns_syscmd"],
+	}
+PACKET11 = {
+	"phase_name" : "exec",
+	"params" : {
+		"commands" : ["a","b","c"]
+	}
+}
+
+PACKET = {
+		"workingdir":".",
+		"command":"dskid",
+		"args":["dskid","--netspec"],
+	}
+#dski_param = configfile.parse_config("netdata.dski")
+
+
+#PACKET2 = {
+#	"phase_name" : "setup",
+#	"params" : dski_param,
+#}
+
+PACKET3 = {
+	"phase_name" : "start",
+	"params" : {},
+}
+	
+PACKET4 = {
+	"phase_name" : "cleanup",
+	"params" : {},
+}
+
+print "opening socket"
+
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect((HOST, PORT))
+wfile = s.makefile('w')
+rfile = s.makefile('r')
+
+protocol.write_config(wfile, PACKET10)
+
+print "getting PID"
+
+pid = protocol.read_config(rfile)
+print "PID is", pid
+
+print "sending daemon config"
+
+protocol.write_config(wfile, PACKET11)
+data = protocol.read_config(rfile)
+print data
+
+data = protocol.read_config(rfile)
+print data
+#-------------------------------
+sys.exit(0)
+
+
+
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect((HOST, PORT))
+
+
+wfile = s.makefile('w')
+rfile = s.makefile('r')
+
+print "sending config", PACKET
+
+protocol.write_config(wfile, PACKET)
+
+print "getting PID"
+
+pid = protocol.read_pid(rfile)
+print "PID is", pid
+
+print "sending daemon config"
+
+protocol.write_config(wfile, PACKET2)
+data = protocol.read_config(rfile)
+sys.stdout.write(`data`)
+
+protocol.write_config(wfile, PACKET3)
+data = protocol.read_config(rfile)
+sys.stdout.write(`data`)
+
+
+time.sleep(5)
+
+
+protocol.write_config(wfile, PACKET4)
+data = protocol.read_config(rfile)
+sys.stdout.write(`data`)
+
+
+
+s.close()
+
+print 'Received', repr(data)
+
+

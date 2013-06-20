@@ -1,0 +1,48 @@
+#!/usr/bin/env python
+from pykusp.configparser import *
+
+debug = False
+testflag = False
+module_name = None
+justprint = False
+options, files = getopt.getopt(sys.argv[1:], "dthpm:")
+
+for option, argument in options:
+    if option == "-d":
+        debug = True
+
+    elif option == "-t":
+        testflag = True
+    elif option == "-m":
+        module_name = argument
+    elif option == "-p":
+        justprint = True
+    elif option == "-h":
+        print sys.argv[0],"<options> <files to test>"
+        print "Accepted options"
+        print " -d            print extra debug info to stderr"
+        print " -t            instead of updating a file, do a parser test"
+        print " -m            specify module name"
+        sys.exit(0)
+    else:
+        print "Unknown option",option
+        print "Use with -h to see available options."
+        sys.exit(1)
+        pass
+    pass
+
+if not files:
+    print "You must specify one or more config files to parse. Use with -h for more info."
+    pass
+
+
+for filename in files:
+    if justprint:
+        pp = pprint.PrettyPrinter(indent=3)
+        pp.pprint(read_file(filename, module_name, debug))
+    elif testflag:
+        test(filename,debug, module_name)
+    else:
+        rewrite(filename, module_name)
+    pass
+pass

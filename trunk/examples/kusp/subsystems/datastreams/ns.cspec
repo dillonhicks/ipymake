@@ -1,0 +1,78 @@
+<root>
+types = "dictionary"
+doc = "Namespace specification"
+opendictdef = @family
+
+<family>
+types = "dictionary"
+doc = "Family specification"
+dictdef = {
+	id = {
+		doc = "Numerical family ID"
+		types = "integer", 
+		default = -1
+	}
+	desc = {
+		doc = "Short description of family"
+		types = "string", 
+		default = "No family description"
+	}
+	entities = {
+		doc = "Dictionary of entities by name"
+		types = dictionary
+		opendictdef = {
+			types = invocation
+			invodef = {
+				"event" = @event
+				"counter" = @entity
+				"histogram" = @histogram
+				"interval" = @entity
+				"object" = @object
+			}
+		}
+	}
+}
+
+<event>
+id = {
+	doc = "Numerical ID of event, usually automatically filled in"
+	types = "integer"
+	default = -1
+}
+desc = {
+	doc = "Short description of event"
+	types = "string"
+	default = "Undocumented event"
+}
+extra_data = {
+	doc = "Extra data function"
+	types = "string"
+	default=""
+}
+
+<object>
+id = {types = "integer", default = -1}
+desc = {types = "string", default = "Undocumented object"}
+kernel_function = {types = "string", required = true}
+
+
+
+<entity>
+id = {types = "integer", default = -1}
+desc = {types = "string", default = "Undocumented entity"}
+
+
+<histogram>
+id = {types = "integer", default = -1}
+desc = {types = "string", default = "Undocumented histogram"}
+units = {types = "string", required = true}
+defaults = {
+	types = "dictionary"
+	dictdef = {
+		"lowerbound" = {types = "long"}
+		"upperbound" = {types = "long"}
+		"buckets" = {types = "integer"}
+	}
+}
+
+

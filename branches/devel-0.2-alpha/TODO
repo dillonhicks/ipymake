@@ -1,0 +1,10 @@
+TODO IPYMake
+=========================
+
+* Create the install hook and have it be user callable before
+  installing all of the compiled binaries to their appropriate
+  locations.
+
+* Add syntax errors for lack of four spaces before commands in target.
+
+* Fix passing command arguments between different files.

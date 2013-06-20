@@ -1,0 +1,31 @@
+New-style namespace datastructure format:
+
+Namespace dictionary uses NSDict() objects. These have the following features:
+	
+	* Each key maps to a family, referenced by name or number
+	* a .metadata attrubute that contains a standard dictionary with
+	  keys "desc" and "shortdesc"
+
+Family dictionary is an AttributeDict()
+
+	* 5 keys: "event" "counter" "histogram" "interval" "object"
+	* .metadata containing {"name","id","desc","shortdesc"}
+
+Each type dictionary is a NSDict()
+
+	* .metadata containing {"greatest" <- greatest id number for that type}
+	* each key maps to entity, by name or number
+
+Each entity dictionary is a standard dictionary.
+     * entities define "printf" "shortdesc" "name" "id"
+
+
+Old-style namespace datastructure format:
+	  events: (name, desc, print_func)
+	  counter: (name, desc)
+	  object: (name, desc, print_func, kernel_func)
+	  histogram: (name, desc)
+	  interval: (name, desc)
+
+	
+	

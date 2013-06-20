@@ -1,0 +1,20 @@
+#labels names,roadmap,future,development,input-appriciated
+#Name ideas for ipymake
+
+= Whats in a name? =
+
+IPYMake is a pretty generic name for the application. While this is generally good since it is also descriptive, it is also unimaginative.
+
+Ideas Thus Far:
+
+  * smartmake 
+    ** Also uninspired, but provides the naming scheme similar to smartgdb. 
+  * pyety (pronounced piety)
+    ** Sounds cool, play on words/spelling. Possibly bad if taken out of context since there could be a religious context. I was thinking "devotion to python" but that could also be the name of the package of tools.
+  * pybuild
+  * pyarch (pronounced park) 
+    ** Python Architect, too clever?
+  * kenobi
+    ** obviously a major nerd reference
+  * py-wright
+    ** A couple good variations on this one. It could be wright as in frank lloyd wright (famous architect), or sounds like 'playwright'. 

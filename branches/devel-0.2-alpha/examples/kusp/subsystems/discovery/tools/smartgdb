@@ -1,0 +1,42 @@
+#!/usr/bin/env python
+
+import os
+from subprocess import *
+from select import *
+import optparse
+import sys
+import pexpect
+
+parser = optparse.OptionParser()
+parser.disable_interspersed_args()
+args = parser.parse_args()[1]
+		
+gdb_cmd = 'gdb '
+for arg in args:
+	gdb_cmd = gdb_cmd + arg + ' '
+
+#gdb = pexpect.spawn(gdb_cmd)
+#gdb.interact()
+
+gdb = Popen(gdb_cmd, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+(gdbin, gdbout, gdberr) = (gdb.stdin, gdb.stdout, gdb.stderr)
+
+gdbofd = gdbout.fileno()
+gdbifd = gdbin.fileno()
+gdbefd = gdberr.fileno()
+stdinfd = sys.stdin.fileno()
+stdoutfd = sys.stdout.fileno()
+
+while gdb.poll() == None:
+	r,w,e = select([gdbofd, gdbefd, stdinfd], [], [], 0)
+	if gdbofd in r:
+		data = os.read(gdbofd, 1000)
+		os.write(stdoutfd, data)
+	if gdbefd in r:
+		data = os.read(gdbefd, 1000)
+		os.write(stdoutfd, data)
+	if stdinfd in r:
+		data = os.read(stdinfd, 1000)
+		while data:
+			n = os.write(gdbifd, data)
+			data = data[n:]

@@ -1,0 +1,19 @@
+#!/usr/bin/python
+
+import sys, os, subprocess
+
+if __name__ == '__main__':
+
+    pid_file = open("/var/run/dskilogd.pid", "w")
+
+    dev_null = open("/dev/null", "w")
+
+    sys.argv[0] = "dskictrl"
+
+    child = subprocess.Popen(sys.argv, shell=False, 
+                             stdout = dev_null,
+                             stderr = dev_null)
+    
+    pid_file.write(`child.pid`+'\n')
+
+    pid_file.close()

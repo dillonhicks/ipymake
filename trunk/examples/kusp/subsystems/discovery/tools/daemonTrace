@@ -1,0 +1,190 @@
+#!/usr/bin/env python
+# Daemon Trace Tool
+# author: Bala Sridhar
+
+import sys
+import os
+import optparse
+import tempfile
+import subprocess as sp
+import signal
+import pickle
+import commands
+import pyccsm.ccsmapi as ccsm_mod
+from threading import Thread
+from pykusp import configfile
+from datastreams import dski
+from datastreams import dsui
+from datastreams.postprocess import pipeline
+from discovery.syscall_numbers import *
+
+class daemonTrace():
+
+	def __init__(self,level):
+		"""Initialize the datastream setup for this instance of the tool."""
+		self.buffer_count = 50
+		self.buffer_size = 500000
+		
+		self.debug_level = level
+		self.enabled_families = [
+			'SMON',
+			'FIFO',
+		      	'FORK',
+			'EXIT',
+			'ROOT_THREAD',
+			'SIGNAL',
+			'SHMEM',
+			'PIPE',
+			'FILE',
+			'EXECVE',
+			'SOCKET',
+			'SYSCALL'
+		]
+
+	def init_dski(self):
+		"""Setup datastream data collection by instantiating the correct set of
+		filters for active filtering and also enable all the instrumentation points
+		that are required for this tool."""
+
+		# create the data directory....
+		daemonTrace_ds_context = None
+		try:
+			datadir = tempfile.mkdtemp(suffix="_dski",dir="/tmp/data")
+			daemonTrace_ds_context = dski.dski_context(datadir)
+		except IOError:
+			print "unable to open DSKI device. Is the module loaded???\n"
+			sys.exit(1)
+
+		# Create the channel for logging events to the correct channel.
+		chan = daemonTrace_ds_context.create_channel("chan1", self.buffer_size,self.buffer_count,0)
+
+		# Attach the created channel to the datastream instance 
+		ds = daemonTrace_ds_context.create_datastream("ds","chan1")
+
+		# Enable all the family of instrumentation points for this tool.
+		for ename in self.enabled_families:
+			ds.enable_family(ename)
+
+		# Configure the set of active filters that will be used for this tool.
+		ds.discovery_filter(self.ccsm_set_name)				
+		ds.task_filter(self.pid, self.ccsm_set_name, 'ACCEPT')
+		#ds.daemonTrace_filter(pid,processName,self.enabled_families)
+		
+		return daemonTrace_ds_context
+
+	def closeTool(self,processName):
+		"""This is called when a instance of the daemonTrace tool has to be closed."""
+		try: 
+			f = open('/tmp/'+processName+'.pid','r')
+			dict = pickle.load(f)
+			pids = dict['pid']
+			f.close()
+			os.system('kill -15 '+pids)
+			os.system('rm -f /tmp/'+processName+'.pid')
+			sys.exit(0)
+
+		except Exception, e:
+			print 'closing the tool not proper ',e
+			sys.exit(0)
+		
+		return
+
+	def terminationSignalHandler(self, signum, frame):
+		""" Used for handling any signal sent to the tool. It shuts down the tool from 
+		monitoring.
+		"""
+		if self.debug_level == 1:
+			print "Inside the signal Handler"
+		raise TerminationException, "Closing the Stream"
+	
+	def getPid(self, processName):
+		"""Get the pid of the daemon process we are going to trace ...."""
+		
+		value = commands.getoutput('ps aux | grep -i '+processName).split()
+		# We are interested in the first pid that we get as part of the output
+		# we get from ps aux | grep -i processname.
+		return value[1]
+
+	def main(self):
+		"""Takes care of adding the process identified to a ccsm set."""
+		parser = optparse.OptionParser()
+		parser.add_option("-p","--pid", dest="pidValue", help="pid of the daemon you want to look at")
+		parser.add_option("-n","--processName", dest="processName", help="The process name that needs to be tracked")
+		parser.add_option("-c","--close", dest="closeProcessName", help="close the process name that needs to be tracked")
+		options, ar = parser.parse_args()
+
+		if options.closeProcessName:
+			print "Closing the Process Name \n"
+			self.closeTool(options.closeProcessName)
+		elif not options.pidValue and not options.processName:
+			print "Please specify the pid that needs to be tracked....\n"
+			sys.exit(1)
+		elif not options.processName:
+			print "Please specify the process name that needs to be tracked.....\n"
+			sys.exit(1)
+
+		self.pidValue = options.pidValue
+		self.processName = options.processName
+
+		signal.signal(signal.SIGTERM, self.terminationSignalHandler)
+
+		if self.processName:
+			self.pid_to_be_tracked = self.getPid(self.processName)
+			print "Pid for the process being tracked......", self.processName, " : ", self.pid_to_be_tracked
+		
+		self.pid = os.getpid()
+		self.ccsm_set_name = "daemonTrace_" + `self.pid`
+		self.traceme_thread_name = "daemonTrace Thread_" + `self.pid`
+		if self.processName:
+			self.daemon_to_be_traced = self.processName + `self.pid_to_be_tracked`
+		else:
+			self.daemon_to_be_traced = "daemon_" + `self.pid_to_be_tracked`
+		
+		# Create the CCSM set representing the traceme thread.
+		self.ccsm_fd = ccsm_mod.ccsm_open()
+		ccsm_mod.ccsm_create_set(self.ccsm_fd, self.ccsm_set_name,0)
+		ccsm_mod.ccsm_create_component_self(self.ccsm_fd, self.traceme_thread_name)
+		ccsm_mod.ccsm_add_member(self.ccsm_fd, self.ccsm_set_name,self.traceme_thread_name)
+
+		# add the daemon to the ccsm set we are tracing...
+		ccsm_mod.ccsm_create_component_by_pid(self.ccsm_fd, self.daemon_to_be_traced, int(self.pid_to_be_tracked))
+		ccsm_mod.ccsm_add_member(self.ccsm_fd, self.ccsm_set_name,self.daemon_to_be_traced)
+
+		self.daemonTrace_ds_context = None
+
+		# Write to the temporary file regarding this instance.
+		f = open('/tmp/'+self.processName+'.pid','w')
+		pids = str(os.getpid())
+		dict = {'pid' : pids}
+		pickle.dump(dict,f)
+		f.close()
+		
+		try:
+			# Start DSKI
+			self.daemonTrace_ds_context = self.init_dski()
+			self.daemonTrace_ds_context.start_logging()
+	
+			# Start DSUI
+			dsui_output = tempfile.mkstemp(suffix="_daemonTrace.dsui.bin", dir="/tmp/data")[1]
+			dsui.start(dsui_output, 0)
+			dsui.event("DaemonTrace", "DaemonTrace_TOOL", os.getpid())
+			dsui.close()
+
+			signal.pause()
+
+		except Exception, e:
+			if self.daemonTrace_ds_context:
+				print "Closing the Stream....."
+				self.daemonTrace_ds_context.close()
+				# First remove the daemon thread from the ccsm group..
+				ccsm_mod.ccsm_remove_member(self.ccsm_fd, self.ccsm_set_name, self.daemon_to_be_traced)
+				ccsm_mod.ccsm_destroy_component_by_name(self.ccsm_fd, self.daemon_to_be_traced)
+				# Now remove the daemonTrace thread from the group...... 
+				ccsm_mod.ccsm_remove_member(self.ccsm_fd, self.ccsm_set_name, self.traceme_thread_name)
+				ccsm_mod.ccsm_destroy_component_by_name(self.ccsm_fd, self.traceme_thread_name)
+				ccsm_mod.ccsm_destroy_set(self.ccsm_fd, self.ccsm_set_name)
+
+if __name__ == "__main__":
+	dTrace = daemonTrace(0)
+	dTrace.main()
+

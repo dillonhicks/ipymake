@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Ftrace doesn't seem to affect the sched_switch tracer.
+
+# Clean out the output before starting. It will accumulate otherwise.
+sudo touch /debug/tracing/trace
+
+# Turn off stacktrace.
+echo nostacktrace > /debug/tracing/trace_options
+
+# Specify the tracer that we want.
+echo sched_switch > /debug/tracing/current_tracer
+
+# Start tracing.
+echo 1 > /debug/tracing/tracing_enabled
+
+# Do something.
+sleep 1
+
+# Stop tracing.
+echo 0 > /debug/tracing/tracing_enabled
+
+# Look at trace.
+cat /debug/tracing/trace

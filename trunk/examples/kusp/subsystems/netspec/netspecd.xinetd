@@ -1,0 +1,18 @@
+# default: off
+# description: Launch the netspec daemon.
+service netspecd
+{
+	disable		= no
+	flags		= IPv4
+	socket_type     = stream
+	wait            = no
+	instances	= 1
+	user		= dinkel
+	server          = /yggnfs/dinkel/kusproot-cmake/bin/netspecd
+	env		= PYTHONPATH=/yggnfs/dinkel/kusproot-cmake/lib/python2.5/site-packages
+	env		+= LD_LIBRARY_PATH=/yggnfs/dinkel/kusproot-cmake/lib
+	env		+= PATH=/usr/bin/:/yggnfs/dinkel/kusproot-cmake/bin
+	log_type	= FILE /tmp/xinetd-netspecd.log
+	log_on_success	+= PID HOST USERID EXIT DURATION
+	log_on_failure  += HOST USERID ATTEMPT
+}

@@ -1,0 +1,161 @@
+RPMS
+	kusp RPM (done)
+	examples RPM
+	workspace/components/selection RPM(?)
+	kernel source RPM(?)
+		This will be our patched kernel.
+	Setup standard F11 box(and ubuntu?) as venues to test the RPMs
+
+Other KUSP source packages
+	tarballs of KUSP, examples, the kernel
+		Use the SVN option that checks out a working directory(svn export)
+	Provide the kernel patches
+	.deb packages
+
+Group scheduling controller tool
+	needs debug statements for input
+	Integration of the group viewer
+	Method to launch the application from the command line(gsched-kickstart)
+
+Gsched-kickstart
+	Activate and exit mode necessary
+	Future
+		Automatically look for .gsh configuration file.
+		Activate hierarchies that have been installed for the application.
+
+Group Viewer
+	Desired view of the hierarchy installed on the system
+	Used to create or interact with a configuration file
+	A new version of the core software is now in gs-structures.py
+	Rewerite of the current group viewer to use the new module is desirable
+	Rename to gsched_veiwer
+	Desire a command-line version to provide a headless capability to view hierarchies
+
+DSKI Control Tool
+	Clean-up to match the python pattern
+	Remove references to unused components
+		Needs to be discussed with Bala
+
+Cleanup
+	Choose to standardize on the python class representation of the DSKI python interface
+		Find tools(Bala) which do not use the class interface directly but use the SWIG bindings instead
+			Decide whether this is appropriate or if they should be switched to using the class interface
+				The class interface is the default interface until proven otherwise
+
+		Review the class DSKI interface
+			Modifications related to refacotring the interface or completing it for more genreal use
+	
+	Remove any remaining references to task alias
+	Investigate /debug references in DSKI
+
+Jared and Tyrian need to go through group scheduling/CCSM internals
+	Proxy in group scheduling
+	Concurrency control in CCSM
+	Concurrency control in DSKI
+	Concurrency control in group scheduling(rcu)
+
+Working Group Scheduling Examples
+	Sigpipe-gsched
+		Simple signal pipeline that uses the group scheduling pid interface
+		Working
+		Expand postprocessing
+			include DSKI from inside the sdf instead of just group scheduling
+			expand the instrumentation, the postprocessing, and the presentation 
+			to make the difference in behaviour of the application when under
+			 group scheduling control and under vanilla linux apparent
+
+	sigpipe-gsched-ccsm
+		Uses group scheduling and CCSM rendezvous, making use of the group scheduling callback API directly
+			This should not be used for the group scheduling control too. They should be kept separate.
+		Working
+		Should use similar processing to sigpipe-gsched
+			Add instrumentation for CCSM/group scheduling rendezvous	
+		Works identical to sigpipe-gsched but it uses CCSM/group scheduling rendezvous instead of the group scheduling pid method.
+
+
+	sigpipe-gschedctrl
+		Delete sigpipe-gsctrl which duplicates sigpipe-gschedctrl.		
+		Performing group scheduling and CCSM rendezvous
+			making use of the CCSM naming API
+			Uses the gschedctrl tool with hierarchy configuration file
+		Logical successor to sigpipe-gsched-ccsm
+			Uses gschedctrl instead of the group scheduling API directly
+		Working
+		Needs postprocessing similar to sigpipe-gsched-ccsm but does not yet have any
+ 
+	balanced-pipeline
+		Multi-tiered hierarchy with dual memberships in the lower and upper tiered groups
+		Need to investigate the postprocessing
+	
+	balanced-pipeline-ccsm
+		A version of the balanced-pipeline examples that makes use of CCSM rendezvous and the GS control tool to set up the hierarchy
+		NOTE: It should be called balanced-pipeline-gschedctrl
+		Similar postprocessing to balanced-pipeline to show the behaviour
+			Same bevhariour
+			Additional DSKI instrumentation to show that CCSM rendezvous is taking place
+
+	socketpipe-gschedctrl
+		A hierarchy similar to sigpipe-gschedctrl
+		uses UNIX sockets isntead of signals
+		uses the gschedctrl tool to set up a hierarchy
+		the statges of the pipeline have workloops
+	
+	MPGD
+		General group scheduling example for dataflow computations
+		Naturally multi-threaded. However, the option to map multiple dataflow nodes onto a single thread may be attractive.
+		Natural venue for generating automatically generating names for different groupings of dataflow nodes
+		Candidate for SMP
+				
+
+	Multiprocessor SDFs
+		balanced-pipeline sdf is multiprocessor capable but we do not have an example that uses that capability
+		ptides sdf is multiprocessor capable and there is an example(?)
+		Simple multiprocessor examples
+			EDF
+			explicit plan
+			sequential
+			round robin with and without quantum
+
+Activities for Next Week
+	Concurrency control review with Jared and Tyrian
+	Tyrian and Dillon confer on /proc processing
+	/proc concurrency review and an instrumentation point to dump the /proc to DSKI
+		possibility of internal DSKI instrumentation point leading to an dump of the /proc information within an Active Filter
+			- consider the concurrency wrappers around the /proc interface
+			- consider abstracting the information generation out into a separate subroutine which has its own internal
+			concurrency control that is safe under the /proc concurrency control but which works better in the Active Filter's
+			context
+			- this would be an ideal candidate for the deferred ccsm context
+
+	Bring to foundsation status all group scheduling examples up to MPGD
+		All
+			Jared
+				Double check the sdf instrumentation for all and make sure it is being used
+
+		Sigpipe-gsched
+			Postprocessing improvement
+				Devon, Jared
+
+		sigpipe-gsched-ccsm
+			Postprocessing improvement to clearly illustrate the rendezvous and the GS and CCSM namespace changes associated with it
+			Some expansion of instrumentation points may be required to complete the set of raw data.
+				Tyrian
+
+		sigpipe-gschedctrl
+			Minor differences in postprocessing to show the ordering of actions that take place
+				Tyrian
+ 
+		balanced-pipeline
+			Figure out Noah's postprocessing and modify and expand as necessary
+				Jared
+	
+		balanced-pipeline-gschedctrl
+			Dillon - Review the example and create a .gsh file
+			Postprocessing
+				Jared	
+
+		socketpipe-gschedctrl
+			Strongly analagous to the sigpipe-gschedctrl
+			Dillon - Review the exisiting .gsh file and modify it to meet any differences
+
+

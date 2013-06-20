@@ -1,0 +1,62 @@
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/exception.c: In function ‘_exceptionThrow_’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/exception.c:29: warning: cast from pointer to integer of different size
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/exception.c:35: warning: cast from pointer to integer of different size
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/exception.c: In function ‘_exceptionThrowDebug_’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/exception.c:43: warning: cast from pointer to integer of different size
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c: In function ‘verify_config_item’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c:227: warning: initialization makes pointer from integer without a cast
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c: In function ‘verify_config_opendict’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c:419: warning: initialization makes pointer from integer without a cast
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c: In function ‘verify_config_invocation’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c:449: warning: initialization makes pointer from integer without a cast
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c: In function ‘verify_config_list’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c:465: warning: initialization makes pointer from integer without a cast
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c: In function ‘verify_config_dictionary’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c:587: warning: initialization makes pointer from integer without a cast
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c: In function ‘verify_config_dict’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c:627: warning: initialization makes pointer from integer without a cast
+preproc_lex.c:1420: warning: ‘input’ defined but not used
+/home/hhicks/workspace/kusp/trunk/subsystems/kusp-common/libkusp/configfile_yacc.y:24: warning: ‘hostclobber’ defined but not used
+In file included from /home/hhicks/workspace/kusp/trunk/subsystems/kusp-common/libkusp/configfile_lex.l:7:
+/home/hhicks/workspace/kusp/trunk/subsystems/kusp-common/libkusp/configfile_yacc.y:15:1: warning: "MODNAME" redefined
+/home/hhicks/workspace/kusp/trunk/subsystems/kusp-common/libkusp/configfile_lex.l:5:1: warning: this is the location of the previous definition
+/home/hhicks/workspace/kusp/trunk/subsystems/kusp-common/libkusp/configfile_yacc.y:21: warning: ‘parse_result’ defined but not used
+/home/hhicks/workspace/kusp/trunk/subsystems/kusp-common/libkusp/configfile_yacc.y:24: warning: ‘hostclobber’ defined but not used
+/home/hhicks/workspace/kusp/trunk/subsystems/kusp-common/libkusp/configfile_yacc.y:28: warning: ‘merge_toplevel’ defined but not used
+/home/hhicks/workspace/kusp/trunk/subsystems/kusp-common/libkusp/configfile_lex.c:1421: warning: ‘yyunput’ defined but not used
+/home/hhicks/workspace/kusp/trunk/subsystems/kusp-common/libkusp/configfile_lex.c:1464: warning: ‘input’ defined but not used
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/exception.c: In function ‘_exceptionThrow_’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/exception.c:29: warning: cast from pointer to integer of different size
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/exception.c:35: warning: cast from pointer to integer of different size
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/exception.c: In function ‘_exceptionThrowDebug_’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/exception.c:43: warning: cast from pointer to integer of different size
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c: In function ‘verify_config_item’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c:227: warning: initialization makes pointer from integer without a cast
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c: In function ‘verify_config_opendict’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c:419: warning: initialization makes pointer from integer without a cast
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c: In function ‘verify_config_invocation’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c:449: warning: initialization makes pointer from integer without a cast
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c: In function ‘verify_config_list’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c:465: warning: initialization makes pointer from integer without a cast
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c: In function ‘verify_config_dictionary’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c:587: warning: initialization makes pointer from integer without a cast
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c: In function ‘verify_config_dict’:
+/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/common/libkusp/configverify.c:627: warning: initialization makes pointer from integer without a cast
+preproc_lex.c:1420: warning: ‘input’ defined but not used
+/home/hhicks/workspace/kusp/trunk/subsystems/kusp-common/libkusp/configfile_yacc.y:24: warning: ‘hostclobber’ defined but not used
+In file included from /home/hhicks/workspace/kusp/trunk/subsystems/kusp-common/libkusp/configfile_lex.l:7:
+/home/hhicks/workspace/kusp/trunk/subsystems/kusp-common/libkusp/configfile_yacc.y:15:1: warning: "MODNAME" redefined
+/home/hhicks/workspace/kusp/trunk/subsystems/kusp-common/libkusp/configfile_lex.l:5:1: warning: this is the location of the previous definition
+/home/hhicks/workspace/kusp/trunk/subsystems/kusp-common/libkusp/configfile_yacc.y:21: warning: ‘parse_result’ defined but not used
+/home/hhicks/workspace/kusp/trunk/subsystems/kusp-common/libkusp/configfile_yacc.y:24: warning: ‘hostclobber’ defined but not used
+/home/hhicks/workspace/kusp/trunk/subsystems/kusp-common/libkusp/configfile_yacc.y:28: warning: ‘merge_toplevel’ defined but not used
+/home/hhicks/workspace/kusp/trunk/subsystems/kusp-common/libkusp/configfile_lex.c:1421: warning: ‘yyunput’ defined but not used
+/home/hhicks/workspace/kusp/trunk/subsystems/kusp-common/libkusp/configfile_lex.c:1464: warning: ‘input’ defined but not used
+libgsched/gsched.c: In function ‘grp_name_join_group’:
+libgsched/gsched.c:367: warning: format ‘%d’ expects type ‘int’, but argument 3 has type ‘long unsigned int’
+[1;31m---------------------------------------------------------------------------[0m
+[1;31mImportError[0m                               Traceback (most recent call last)
+
+[1;32m/home/hhicks/workspace/ipymake/trunk/examples/kusp/subsystems/discovery/<ipython console>[0m in [0;36m<module>[1;34m()[0m
+
+[1;31mImportError[0m: No module named ipym_build_discovery

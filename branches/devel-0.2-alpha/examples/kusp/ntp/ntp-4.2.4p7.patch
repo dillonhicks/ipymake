@@ -1,0 +1,1076 @@
+diff -u -r -N -b --exclude-from=diff-exclude ntp-ref/configure.ac ntp-work/configure.ac
+--- ntp-ref/configure.ac	2009-05-12 00:58:54.000000000 -0500
++++ ntp-work/configure.ac	2009-10-30 08:29:46.000000000 -0500
+@@ -155,7 +155,13 @@
+     #
+ esac
+ 
+-
++# check for KUSP stuff
++AC_ARG_WITH(kusproot,
++        AC_HELP_STRING([--with-kusproot=DIR], [use KUSP root from DIR @<:@/usr/local/@:>@]),
++        KUSPROOT=$withval,
++        KUSPROOT=/usr/local)
++echo "The KUSP root is set to: ${KUSPROOT}"
++AC_SUBST(KUSPROOT)
+ 
+ AC_MSG_CHECKING([for bin subdirectory])
+ AC_ARG_WITH(binsubdir,
+@@ -4663,5 +4669,10 @@
+ AC_CONFIG_FILES(util/Makefile)
+ 
+ AC_CONFIG_SUBDIRS(sntp)
+-
++echo "The KUSP root is set to: ${KUSPROOT}"
++if test -f "$KUSPROOT/lib/libkusp.so"; then
++        AC_MSG_RESULT([The KUSP root appears valid.])
++else
++        AC_MSG_WARN([KUSP does not seem to be installed in ${KUSPROOT}])
++fi
+ AC_OUTPUT
+diff -u -r -N -b --exclude-from=diff-exclude ntp-ref/include/ntp_fp.h ntp-work/include/ntp_fp.h
+--- ntp-ref/include/ntp_fp.h	2006-06-06 15:16:18.000000000 -0500
++++ ntp-work/include/ntp_fp.h	2009-10-30 08:29:46.000000000 -0500
+@@ -358,7 +358,9 @@
+ extern	void	get_systime	P((l_fp *));
+ extern	int	step_systime	P((double));
+ extern	int	adj_systime	P((double));
+-
++#ifdef NEW_NTP_CHANGES
++extern  int     convert_systime3(l_fp *now);
++#endif
+ extern	struct tm * ntp2unix_tm P((u_long ntp, int local));
+ 
+ #define	lfptoa(_fpv, _ndec)	mfptoa((_fpv)->l_ui, (_fpv)->l_uf, (_ndec))
+diff -u -r -N -b --exclude-from=diff-exclude ntp-ref/include/ntp.h ntp-work/include/ntp.h
+--- ntp-ref/include/ntp.h	2008-08-10 06:02:42.000000000 -0500
++++ ntp-work/include/ntp.h	2009-10-30 08:29:46.000000000 -0500
+@@ -4,6 +4,10 @@
+ #ifndef NTP_H
+ #define NTP_H
+ 
++#ifdef NEW_NTP_CHANGES
++#define KU_MAGIC_NUM 2345
++#endif
++
+ #include "ntp_types.h"
+ #include <math.h>
+ #ifdef OPENSSL
+@@ -590,6 +594,14 @@
+  *
+  * Note that all u_fp and l_fp values arrive in network byte order
+  * and must be converted (except the mac, which isn't, really).
++ *
++ * KU_NTP: A copy of this packet structure is in include/linux/clksync.h in
++ * the kernel.  Everytime this packet structure changes you must mirror those 
++ * changes in the kernel header file. The structure is needed because the ntp 
++ * packet is manipulated from within the kernel.
++ *
++ * Note at the bottom of this packet is an ifdef which modifies this
++ * packet if OPENSSL is defined.
+  */
+ struct pkt {
+ 	u_char	li_vn_mode;	/* leap indicator, version and mode */
+@@ -604,7 +616,31 @@
+ 	l_fp	rec;		/* receive time stamp */
+ 	l_fp	xmt;		/* transmit time stamp */
+ 
++#ifdef NEW_NTP_CHANGES
++        u_int32 magic_num;
++        unsigned long long start_ts;       /* start field added at KU */
++        unsigned long long rx_ts;          /* rx field added at KU */
++        unsigned long long tx_ts;          /* tx field added at KU */
++        unsigned long long end_ts;         /* end field added at KU */
++
++        long               xtime_tv_sec;
++        long               xtime_tv_nsec;
++        unsigned long long xtime_tsc;
++        unsigned long tsc_khz;
++
++        unsigned long saddr;
++        unsigned long daddr;
++        u_int32 pkt_id;         /* unique packet identifier added at KU */
++        /*
++         * 12 + X
++         * X = 6 64bit #'s + 3 32bit #'s = 15 32bit #'s = 15
++         * for our extra data.
++         */
++#define LEN_PKT_NOMAC   (12+17) * sizeof(u_int32) /* min header length */
++#else
+ #define	LEN_PKT_NOMAC	12 * sizeof(u_int32) /* min header length */
++#endif
++
+ #define	LEN_PKT_MAC	LEN_PKT_NOMAC +  sizeof(u_int32)
+ #define MIN_MAC_LEN	3 * sizeof(u_int32)	/* DES */
+ #define MAX_MAC_LEN	5 * sizeof(u_int32)	/* MD5 */
+diff -u -r -N -b --exclude-from=diff-exclude ntp-ref/libntp/Makefile.am ntp-work/libntp/Makefile.am
+--- ntp-ref/libntp/Makefile.am	2006-06-06 15:16:25.000000000 -0500
++++ ntp-work/libntp/Makefile.am	2009-10-30 08:29:46.000000000 -0500
+@@ -24,6 +24,7 @@
+ 	$(srcdir)/../libisc/netaddr.c $(srcdir)/../libisc/sockaddr.c \
+ 	$(srcdir)/../libisc/netscope.c
+ libntp_a_SOURCES = systime.c $(libntp_a_SRCS)
++libntp_a_CFLAGS  = -DNEW_NTP_CHANGES $(AM_CFLAGS)
+ libntpsim_a_SOURCES = systime_s.c $(libntp_a_SRCS)
+ EXTRA_libntp_a_SOURCES = adjtimex.c
+ INCLUDES = -I$(top_srcdir)/include -I../include
+diff -u -r -N -b --exclude-from=diff-exclude ntp-ref/libntp/systime.c ntp-work/libntp/systime.c
+--- ntp-ref/libntp/systime.c	2006-06-06 15:16:30.000000000 -0500
++++ ntp-work/libntp/systime.c	2009-10-30 08:29:46.000000000 -0500
+@@ -48,6 +48,57 @@
+ 
+ #ifndef SIM
+ 
++#ifdef NEW_NTP_CHANGES
++int
++convert_systime3(
++        l_fp *now
++        )
++{
++        struct timespec tv;
++        double dtemp1;
++        double dtemp2;
++
++        tv.tv_sec  = now->l_ui;
++        tv.tv_nsec = now->l_uf;
++
++        /*
++         *   Time of day conversion constant.  Ntp's time scale starts in 
++         *   1900, but Unix time scale starts in 1970.
++         *
++         *   JAN_1970 = 0x83aa7e80 [i.e. 2208988800 (1970 - 1900) in secs]
++         */
++        now->l_i = tv.tv_sec + JAN_1970;
++
++        /*
++         * now convert the nanoseconds part into a fractional second
++         * in the temporary double variable, and then convert it into
++         * a fixed point unsigned integer representing that fraction
++         * in units of 1/2^32. Two different orders for the multiply
++         * and divide with different implications for precision. We
++         * try to decide between them.
++         */
++        /* FRAC = 4294967296.   which is 2^32 as a double */
++        dtemp1 = tv.tv_nsec /(double)1e9;
++        if ( dtemp1 >= (double)1.0 ) {
++          printf ("ERROR!!! Fractional second ended up greater than 1: %f nsec = %ld\n", dtemp1, tv.tv_nsec);
++          return -1;
++        }
++        dtemp1 = dtemp1 * FRAC;
++
++        dtemp2 = (tv.tv_nsec * FRAC);
++        /*if ( dtemp2 >= (double)1.0 ) {
++          printf ("ERROR!!! Fractional second ended up greater than 1: %f\n", dtemp2);
++        }*/
++        dtemp2 = dtemp2 / (double) 1e9;
++
++        //printf("Two versions of fractional second in 1/2^32 units 1: %f 2: %f\n", dtemp1, dtemp2); 
++        
++        now->l_uf = (u_int32)dtemp2;
++        //printf("l_uf returned: %u\n",now->l_uf);
++        return 1;
++}
++#endif
++
+ /*
+  * get_systime - return system time in NTP timestamp format.
+  */
+diff -u -r -N -b --exclude-from=diff-exclude ntp-ref/Makefile.include ntp-work/Makefile.include
+--- ntp-ref/Makefile.include	1969-12-31 18:00:00.000000000 -0600
++++ ntp-work/Makefile.include	2009-10-30 08:29:46.000000000 -0500
+@@ -0,0 +1,12 @@
++# useful directories
++KUSPBIN = @KUSPROOT@/bin/
++KUSPINCLUDE = @KUSPROOT@/include/
++KUSPLIB = @KUSPROOT@/lib/
++
++# these variables are used by applications that we call from our
++# makefiles.
++export KUSPROOT=@KUSPROOT@
++
++# by default, we want to add the kusp headers
++# and kusp libraries to our compilations.
++AM_CFLAGS = -I$(KUSPINCLUDE) -L$(KUSPLIB)
+diff -u -r -N -b --exclude-from=diff-exclude ntp-ref/ntpd/Makefile.am ntp-work/ntpd/Makefile.am
+--- ntp-ref/ntpd/Makefile.am	2008-03-22 06:03:20.000000000 -0500
++++ ntp-work/ntpd/Makefile.am	2009-10-30 08:29:46.000000000 -0500
+@@ -1,3 +1,4 @@
++include $(top_srcdir)/Makefile.include
+ AUTOMAKE_OPTIONS= ../util/ansi2knr
+ 
+ bindir=	${exec_prefix}/${BINSUBDIR}
+@@ -21,7 +22,9 @@
+ # sqrt                                ntp_control.o
+ # floor                               refclock_wwv.o
+ # which are (usually) provided by -lm.
+-ntpd_LDADD = $(LDADD) -lm @LCRYPTO@ $(LIBOPTS_LDADD) ../libntp/libntp.a
++ntpd_LDADD = $(LDADD) -ldsui -lm -lpthread -lrt @LCRYPTO@ $(LIBOPTS_LDADD) ../libntp/libntp.a -ldl
++ntpd_LDFLAGS = -static $(AM_LDFLAGS)
++ntpd_CFLAGS = -I@KUSPROOT@/include -DNEW_NTP_CHANGES
+ ntpdsim_LDADD = $(LDADD) ../libntp/libntpsim.a -lm @LCRYPTO@ $(LIBOPTS_LDADD)
+ ntpdsim_CFLAGS = $(CFLAGS) -DSIM
+ check_y2k_LDADD = $(LDADD) ../libntp/libntp.a
+@@ -34,6 +37,9 @@
+ ###							Y2Kfixes
+ check_PROGRAMS = @MAKE_CHECK_Y2K@
+ EXTRA_PROGRAMS = check_y2k ntpdsim
++
++libntpd_a_CFLAGS = -DNEW_NTP_CHANGES $(AM_CFLAGS)
++
+ run_ag = cd $(srcdir) && autogen -L ../include --writable
+ std_def_list=	$(top_srcdir)/include/debug-opt.def		\
+ 		$(top_srcdir)/include/autogen-version.def 	\
+diff -u -r -N -b --exclude-from=diff-exclude ntp-ref/ntpd/ntpd.c ntp-work/ntpd/ntpd.c
+--- ntp-ref/ntpd/ntpd.c	2009-05-18 03:22:36.000000000 -0500
++++ ntp-work/ntpd/ntpd.c	2009-10-30 08:29:46.000000000 -0500
+@@ -207,7 +207,16 @@
+ static void	set_process_priority	P((void));
+ static void	init_logging		P((char const *));
+ static void	setup_logfile		P((void));
++#ifdef NEW_NTP_CHANGES
++int clksync_dev;
++#define OPEN_CLK_SYNC \
++        if ((clksync_dev = clksync_open()) < 0) { \
++                printf("ntpd: failed opening clksync dev\n"); \
++                exit(-1); \
++        }
+ 
++#define CLOSE_CLK_SYNC close(clksync_dev);
++#endif
+ /*
+  * Initialize the logging
+  */
+@@ -306,7 +315,13 @@
+ 	char *argv[]
+ 	)
+ {
++#ifdef NEW_NTP_CHANGES
++        OPEN_CLK_SYNC
++#endif
+ 	return ntpdmain(argc, argv);
++#ifdef NEW_NTP_CHANGES
++        CLOSE_CLK_SYNC
++#endif
+ }
+ #endif /* SYS_WINNT */
+ #endif /* NO_MAIN_ALLOWED */
+diff -u -r -N -b --exclude-from=diff-exclude ntp-ref/ntpd/ntp_proto.c ntp-work/ntpd/ntp_proto.c
+--- ntp-ref/ntpd/ntp_proto.c	2006-12-28 06:03:32.000000000 -0600
++++ ntp-work/ntpd/ntp_proto.c	2009-10-30 08:41:35.000000000 -0500
+@@ -23,7 +23,10 @@
+ #if defined(__FreeBSD__) && __FreeBSD__ >= 3
+ #include <sys/sysctl.h>
+ #endif
+-
++#ifdef NEW_NTP_CHANGES
++#include <clksyncapi.h>
++extern int clksync_dev;
++#endif
+ /*
+  * This macro defines the authentication state. If x is 1 authentication
+  * is required; othewise it is optional.
+@@ -2376,7 +2379,10 @@
+ 	int	sendlen, authlen;
+ 	keyid_t	xkeyid = 0;	/* transmit key ID */
+ 	l_fp	xmt_tx;
+-
++#ifdef NEW_NTP_CHANGES
++        printf("clksync: learn more about ntp. why are we here?\n");
++        exit(-1);
++#endif
+ 	if (!peer->dstadr)	/* don't bother with peers without interface */
+ 		return;
+ 
+@@ -2817,6 +2823,10 @@
+ 	u_int32	temp32;
+ #endif
+ 
++#ifdef NEW_NTP_CHANGES
++        clksync_info_t nfo;
++#endif
++
+ 	/*
+ 	 * Initialize transmit packet header fields from the receive
+ 	 * buffer provided. We leave some fields intact as received. If
+@@ -2916,6 +2926,60 @@
+ 	 */
+ 	sendlen = LEN_PKT_NOMAC;
+ 	if (rbufp->recv_length == sendlen) {
++
++#ifdef NEW_NTP_CHANGES
++          /*
++           * for identification of our special ntp packet.
++           */
++          xpkt.magic_num = KU_MAGIC_NUM;
++          xpkt.pkt_id = rpkt->pkt_id;
++
++          /*
++           * since the kernel code doesn't know about itself as a
++           * server or client, we put the data in the correct place
++           * here. the client just sent us a packet, and put its xmit
++           * value in tx_ts, so we can move that data to the start
++           * field. likewise, the server (us) put the receieve value
++           * in end_ts so we can move it to rx_ts.
++           */
++          xpkt.start_ts  = rpkt->tx_ts;
++          xpkt.rx_ts     = rpkt->end_ts;
++
++          xpkt.end_ts    = 0;
++          xpkt.tx_ts     = 0;
++
++          if (clksync_get_info(clksync_dev, &nfo) < 0) {
++                          printf("fast_xmit: clksync_get_info\n");
++                          exit(-1);
++          }
++
++
++          /*
++           * We back the xtime-to-tsc correspondence on the server
++           * back before the timestamp taken when we received the
++           * packet. xtime-to-tsc could probably be stuffed into the
++           * packet in the net device driver as another option.
++           */
++          while (nfo.ts > xpkt.rx_ts)
++          {
++                  nfo.ts -= nfo.tsckhz;
++
++                  if (nfo.time.tv_nsec < 1000000) {
++                          nfo.time.tv_sec--;
++                          nfo.time.tv_nsec += 1000000000;
++                  }
++
++                  nfo.time.tv_nsec -= 1000000;
++          }
++
++          xpkt.tsc_khz               = nfo.tsckhz;
++          xpkt.xtime_tv_sec          = nfo.time.tv_sec;
++          xpkt.xtime_tv_nsec         = nfo.time.tv_nsec;
++          xpkt.xtime_tsc             = nfo.ts;
++
++          /*DSTRM_EVENT_DATA(CLKSYNC, SERVER_XMT_PKT, 0, 
++                          sizeof(*xpkt), xpkt, "print_ntp_pkt_info");*/
++#endif
+ 		get_systime(&xmt_ts);
+ 		HTONL_FP(&xmt_ts, &xpkt.xmt);
+ 		sendpkt(&rbufp->recv_srcadr, rbufp->dstadr, 0, &xpkt,
+diff -u -r -N -b --exclude-from=diff-exclude ntp-ref/ntpdate/Makefile.am ntp-work/ntpdate/Makefile.am
+--- ntp-ref/ntpdate/Makefile.am	2007-02-19 05:02:14.000000000 -0600
++++ ntp-work/ntpdate/Makefile.am	2009-10-30 08:29:46.000000000 -0500
+@@ -1,18 +1,45 @@
++include $(top_srcdir)/Makefile.include
+ #AUTOMAKE_OPTIONS=	../util/ansi2knr
+ 
+ bindir=		${exec_prefix}/${BINSUBDIR}
+ #bin_PROGRAMS=	ntpdate ntptimeset
+-bin_PROGRAMS=	ntpdate
++bin_PROGRAMS=	ntpdate ku_ntpdate
+ EXTRA_PROGRAMS=	ntptimeset
+ 
+ ntptimeset_SOURCES=	ntptimeset.c ntptime_config.c
+-AM_CPPFLAGS=	-I$(top_srcdir)/include
++AM_CPPFLAGS = -DCONFIG_DSUI -DPREFIX="\"$(prefix)\"" \
++	-I$(top_srcdir)/include \
++	-DHAVE_LIBDSUI
+ # LDADD might need RESLIB and ADJLIB
+ LDADD=		version.o ../libntp/libntp.a
+ DISTCLEANFILES=	.version version.c stamp-v
+ noinst_HEADERS=	ntpdate.h
+ ETAGS_ARGS=	Makefile.am
+ 
++ntpdate_SOURCES    = ntpdate.c
++ku_ntpdate_SOURCES = ntpdate.c
++#nodist_ku_ntpdate_SOURCES = ntpdate_dsui.c
++
++ntpdate_CFLAGS      = -UNEW_NTP_CHANGES $(AM_CFLAGS)
++ku_ntpdate_CFLAGS = -DNEW_NTP_CHANGES  $(AM_CFLAGS)
++ku_ntpdate_LDFLAGS = -L@KUSPROOT@/lib -static
++ku_ntpdate_LDADD = $(LDADD) -lrt -ldsui -lkusp -lrt -lm -lpthread
++
++#BUILT_SOURCES = ntpdate_dsui.c ntpdate_dsui.h
++#CLEANFILES = $(BUILT_SOURCES)
++
++#ntpdate_dsui.c: ntpdate_dsui.h
++#ntpdate_dsui.h:
++#       dsui-header --prefix ntpdate
++
++clean-local:
++	-rm ntpdate_dsui.c ntpdate_dsui.h 
++
++#BUILT_SOURCES = ntpdate_dsui_table.h
++#CLEANFILES = ntpdate_dsui_table.h ntpdate_dsui_vars.c ntpdate_dsui_families.h
++
++#ntpdate_dsui_table.h: Makefile
++#       $(DSUI_PARSE) -t ntpdate -z $(ADMIN_NS) -n $(top_srcdir)/clock_sync/datastreams/conf/ntpdate.ns
+ $(PROGRAMS): $(LDADD)
+ 
+ ../libntp/libntp.a:
+diff -u -r -N -b --exclude-from=diff-exclude ntp-ref/ntpdate/ntpdate.c ntp-work/ntpdate/ntpdate.c
+--- ntp-ref/ntpdate/ntpdate.c	2008-03-22 06:03:22.000000000 -0500
++++ ntp-work/ntpdate/ntpdate.c	2009-10-30 08:43:15.000000000 -0500
+@@ -75,7 +75,49 @@
+ #endif
+ 
+ #include "recvbuff.h"
++#ifdef NEW_NTP_CHANGES
++/***************************************************************/
++/*
++ * All new ntp code is encapsulated in NEW_NTP_CHANGES ifdef's.
++ * 
++ * All of these macros are [un]defined in Makefile.am. Makefile.am is
++ * setup to automatically create two version of ntpdate: vanilla
++ * ntpdate, and ku_ntpdate.
++ */
++/***************************************************************/
++#include <asm/param.h> /* for HZ */
++#include <linux/clksync.h>
++#include <clksyncapi.h>
++#include <string.h>
++#include <sys/types.h>
++#include <sys/shm.h>
++#include <sys/ipc.h>
++#include <assert.h>
++
++/*
++ * NOTE: Turn on DSUI_ENABLED to collect copious amounts of
++ * datastreams instrumentation.
++ * XXX: The Makefile is not correctly producing the _dsui.*
++ * files right now. run: "dsui-header --prefix ntpdate" in the
++ * ntpdate directory to create these files and use the
++ * datastreams instrumentation
++ */
++#define DSUI_ENABLED 0
++#if DSUI_ENABLED
++#include "ntpdate_dsui.h"
++#endif
++
++/* holds clksync values for this computer */
++clksync_info_t global_client_nfo;
++
++int clksync_dev;
++int very_verbose = 0;
++#define NSECS_PER_SEC 1000000000L
++
++#define PRT_DEBUG if (very_verbose)
+ 
++/***************************************************************/
++#endif /* NEW_NTP_CHANGES */
+ #ifdef SYS_WINNT
+ #define EPROTONOSUPPORT WSAEPROTONOSUPPORT
+ #define EAFNOSUPPORT	WSAEAFNOSUPPORT
+@@ -215,7 +257,18 @@
+ 
+ static	void	transmit	P((struct server *));
+ static	void	receive 	P((struct recvbuf *));
++
++#ifdef NEW_NTP_CHANGES
++/*
++ * the last argument is added to hold a tsc value which is the end tsc
++ * timestamp reported. it follows the ntp packet data around during
++ * vanilla ntpdate's various transofmrations.
++ */
++static  void    server_data P((struct server *, s_fp, l_fp *, u_fp, unsigned long long));
++#else
+ static	void	server_data P((struct server *, s_fp, l_fp *, u_fp));
++#endif
++
+ static	void	clock_filter	P((struct server *));
+ static	struct server *clock_select P((void));
+ static	int clock_adjust	P((void));
+@@ -313,7 +366,45 @@
+ 	char *argv[]
+ 	)
+ {
++#ifdef NEW_NTP_CHANGES  
++        int ret;
++
++        /*
++         * XXX: The DSUI associated with this program may be
++         * used to diagnose a problem with this software during
++         * a port. It's currently off because it creates many
++         * unnecessary files otherwise
++         */
++
++#if DSUI_ENABLED
++        DSUI_BEGIN(&argc, &argv);
++#endif
++
++        if ((clksync_dev = clksync_open()) < 0) {
++                perror("clksync_open");
++                exit(-1);
++        }
++
++        if (clksync_get_info(clksync_dev, &global_client_nfo) < 0) {
++                        printf("ntpdate: clksync_get_info");
++        }
++
++        /* 
++         * this is probably not needed, but we want to guarantee the
++         * xtime/tsc values are in the past so that offsets calculated
++         * in later are not negative.
++         */
++        usleep(10000);
++
++        /* go do regular ntp stuff */
++        ret = ntpdatemain (argc, argv);
++#if DSUI_ENABLED
++        DSUI_CLEANUP();
++#endif
++        return ret;
++#else
+ 	return ntpdatemain (argc, argv);
++#endif
+ }
+ #endif /* NO_MAIN_ALLOWED */
+ 
+@@ -368,7 +459,15 @@
+ 	/*
+ 	 * Decode argument list
+ 	 */
++#ifdef NEW_NTP_CHANGES
++        /*
++         * added the -V option. this will be used to print out all the
++         * debug printfs hanging out.
++         */
++        while ((c = ntp_getopt(argc, argv, "46a:bBde:k:o:p:qst:uvV")) != EOF)
++#else
+ 	while ((c = ntp_getopt(argc, argv, "46a:bBde:k:o:p:qst:uv")) != EOF)
++#endif
+ 		switch (c)
+ 		{
+ 		case '4':
+@@ -443,6 +542,13 @@
+ 		case 'v':
+ 			verbose = 1;
+ 			break;
++#ifdef NEW_NTP_CHANGES
++                case 'V':
++                        /* also turn on built-in verbose */
++                        very_verbose = 1;
++                        verbose = 1;
++                        break;
++#endif
+ 		case 'u':
+ 			unpriv_port = 1;
+ 			break;
+@@ -673,7 +779,86 @@
+ 	return clock_adjust();
+ }
+ 
++#ifdef NEW_NTP_CHANGES
++void tsc_offset_to_ntp_time(l_fp *ntptime, unsigned long long offset_tsc,
++                        clksync_info_t *nfo)
++{
++        long temp_sec;
++        unsigned long long temp_tsc;
++        unsigned long long temp_nsec;
++        unsigned long long tsc_per_sec;
++        unsigned long long tmp;
++
++        tsc_per_sec = ((unsigned long long)nfo->tsckhz * ((unsigned long long)1000));
++
++        /* 
++         * Convert the start timestamp offset into (sec, nsec) units which 
++         * we store in (l_ui, l_uf) members of l_fp structure. Note 
++         * that the client info provides TSC-per-second value determined
++         * by clock calibration to use in the conversion. 
++         */
++        temp_sec = offset_tsc / tsc_per_sec;
++
++
++        /*
++         * We are storing the seconds portion in seconds since
++         * UNIX epoch 
++         */
++        ntptime->l_ui = temp_sec + nfo->time.tv_sec;
++
++
++
++        /* 
++         * Now we need to find the start time's nanosecond component.
++         * We begin by subtracting the seconds since the client_info
++         * base (temp_sec) converted into TSC units from the TSC value,
++         * leaving the fractional second in TSC units, inside temp_tsc
++         */
++        tmp = (unsigned long long)temp_sec * tsc_per_sec;
++        temp_tsc = offset_tsc - tmp;
+ 
++        /*  
++         * Convert temp_tsc to nanoseconds. Note that we are multiplying
++         * by nanoseconds per second first to create a big number before
++         * dividing by the number of TSC per second on this machine
++         */
++        temp_nsec = ( temp_tsc * NSECS_PER_SEC );
++
++
++        temp_nsec =  temp_nsec / tsc_per_sec;
++
++        /*  
++         * Now, add in the nanosecond component of the client_into base
++         * and store this in the fractional part of the start_time
++         * structure.  Note that since the nsec components may add up to
++         * more than one second, we may have to carry a second up into l_ui.
++         */
++        ntptime->l_uf = temp_nsec + nfo->time.tv_nsec;
++
++        if( ntptime->l_uf > NSECS_PER_SEC ) {
++                /*  
++                 * Carry is required
++                 */
++                ntptime->l_uf -= NSECS_PER_SEC;
++                ntptime->l_ui += 1;
++        }
++
++        /*  
++         * Now we convert a (sec,nsec) fixed point integer into
++         * the representation required by NTP which is sec.fraction
++         * as well as converting the UNIX 1970 epoch into the NTP
++         * 1900 epoch. Same logic as used for start_time.
++         */
++        if(convert_systime3(ntptime) < 0)
++                perror("Error start_time calculation");
++
++        PRT_DEBUG {
++                printf("ntpdate: After conversion: packet start time in seconds since ntp epoch %u.%u\n",
++                       ntptime->l_ui, ntptime->l_uf);
++        }
++
++}
++#endif
+ /*
+  * transmit - transmit a packet to the given server, or mark it completed.
+  *		This is called by the timeout routine and by the receive
+@@ -696,7 +881,11 @@
+ 		 * zeros into the filter.
+ 		 */
+ 		L_CLR(&ts);
++#ifdef NEW_NTP_CHANGES
++                server_data(server, 0, &ts, 0, 0);
++#else
+ 		server_data(server, 0, &ts, 0);
++#endif
+ 	}
+ 
+ 	if ((int)server->filter_nextpt >= sys_samples) {
+@@ -744,12 +933,35 @@
+ 			printf("transmit auth to %s\n",
+ 			   stoa(&(server->srcadr)));
+ 	} else {
++
++#ifdef NEW_NTP_CHANGES
++          xpkt.magic_num = KU_MAGIC_NUM;
++          xpkt.pkt_id   = 0;
++
++          xpkt.start_ts  = 0;
++          xpkt.tx_ts     = 0;
++          xpkt.rx_ts     = 0;
++          xpkt.end_ts    = 0;
++
++          xpkt.xtime_tv_sec    = 0;
++          xpkt.xtime_tv_nsec   = 0;
++          xpkt.xtime_tsc       = 0;
++          xpkt.tsc_khz          = 0;
++#endif
++
+ 		get_systime(&(server->xmt));
+ 		HTONL_FP(&server->xmt, &xpkt.xmt);
+ 		sendpkt(&(server->srcadr), &xpkt, LEN_PKT_NOMAC);
+ 
+ 		if (debug > 1)
++#ifndef NEW_NTP_CHANGES
++			printf("transmit to %s\n", stoa(&(server->srcadr)));
++#else
++                {
+ 			printf("transmit to %s\n", stoa(&(server->srcadr)));
++                        printf("KU magic num = %d, start_ts = %llu\n", xpkt.magic_num, xpkt.start_ts);
++                }
++#endif
+ 	}
+ 
+ 	/*
+@@ -777,7 +989,22 @@
+ 	l_fp ci;
+ 	int has_mac;
+ 	int is_authentic;
++#ifdef NEW_NTP_CHANGES
++        /*
++         * Variables for storing and calculating with TSC values put
++         * into NTP packet as it goes from client to the server and
++         * getting offsets from a known TSC<->XTIME correspondence
++         */
++        unsigned long long start_tsc, end_tsc, xmt_tsc, recv_tsc;
+ 
++        /*
++         * Structures for holding integer and fraction representations
++         * of NTP packet times as separate integers, (secs, frac)
++         */
++        l_fp start_time, end_time, xmt_time, recv_time;
++
++        clksync_info_t client_nfo, server_nfo;
++#endif
+ 	if (debug)
+ 		printf("receive(%s)\n", stoa(&rbufp->recv_srcadr));
+ 	/*
+@@ -879,6 +1106,124 @@
+ 		return;
+ 	}
+ 
++#ifdef NEW_NTP_CHANGES
++
++        client_nfo = global_client_nfo;
++
++        server_nfo.tsckhz               = rpkt->tsc_khz;
++        server_nfo.time.tv_sec  = rpkt->xtime_tv_sec;
++        server_nfo.time.tv_nsec = rpkt->xtime_tv_nsec;
++        server_nfo.ts                   = rpkt->xtime_tsc;
++
++        /*
++         * Now we will convert each of the timestamps in the ntp packet to
++         * and offset (sec, nsec) from the beginning of the NTP epoch
++         * which starts at Jan 1, 1900. Note that the UNIX epoch starts
++         * Jan 1, 1970 and we have to compensate for that.
++         */
++
++        /****************************************************************
++         *                                                   
++         *        t0 (start_time)       t3 (end_time) 
++         *       ______________________________________________  Client
++         *           \                     /
++         *            \                   /
++         *             \                 / 
++         *       _______\_______________/_______________________ Server
++         *        t1 (recv_time)     t2 (xmt_time)
++         *
++         *
++         ****************************************************************/
++
++        /*
++         * We begin by calculating the offset of each TSC in the ntp
++         * packet from the TSC in the client and server info.
++         * 
++         * Note that the timestamps are taken in start, recv, xmit, end
++         * order and that recv and xmit are on the server.
++         */
++
++        /*
++        fprintf(stderr, "Info for packet:\t%u\n", rpkt->pkt_id);
++        fprintf(stderr, "rpkt->start_ts %llu, client_nfo.ts %llu\n", rpkt->start_ts, client_nfo.ts);
++        fprintf(stderr, "rpkt->rx_ts    %llu, server_nfo.ts %llu\n", rpkt->rx_ts, server_nfo.ts);
++
++        fprintf(stderr, "rpkt->tx_ts    %llu, server_nfo.ts %llu\n", rpkt->tx_ts, server_nfo.ts);
++        fprintf(stderr, "rpkt->end_ts   %llu, client_nfo.ts %llu\n\n", rpkt->end_ts, client_nfo.ts);
++         */
++
++#if DSUI_ENABLED
++        DSTRM_EVENT_DATA(NTPDATE, CLIENT_RCV_PKT, 0,
++                        sizeof(*rpkt), rpkt, "print_ntp_pkt_info");
++        DSTRM_EVENT_DATA(NTPDATE, NTP_CLIENT_GET_NFO, rpkt->pkt_id,
++                        sizeof(client_nfo), &client_nfo, "print_clksync_info");
++#endif
++
++        assert(rpkt->start_ts > client_nfo.ts);
++        assert(rpkt->end_ts   > client_nfo.ts);
++        assert(rpkt->tx_ts    > server_nfo.ts);
++        assert(rpkt->rx_ts    > server_nfo.ts);
++
++        start_tsc = rpkt->start_ts - client_nfo.ts;
++        end_tsc   = rpkt->end_ts   - client_nfo.ts;
++
++        xmt_tsc   = rpkt->tx_ts    - server_nfo.ts;
++        recv_tsc  = rpkt->rx_ts    - server_nfo.ts;
++
++#if DSUI_ENABLED
++        DSTRM_EVENT_DATA(NTPDATE, START_TSC, rpkt->pkt_id,
++                        sizeof(rpkt->start_ts), &(rpkt->start_ts), "print_unsigned_long_long");
++        DSTRM_EVENT_DATA(NTPDATE, END_TSC, rpkt->pkt_id,
++                        sizeof(rpkt->end_ts), &(rpkt->end_ts), "print_unsigned_long_long");
++        DSTRM_EVENT_DATA(NTPDATE, XMT_TSC, rpkt->pkt_id,
++                        sizeof(rpkt->tx_ts), &(rpkt->tx_ts), "print_unsigned_long_long");
++        DSTRM_EVENT_DATA(NTPDATE, RECV_TSC, rpkt->pkt_id,
++                        sizeof(rpkt->rx_ts), &(rpkt->rx_ts), "print_unsigned_long_long");
++#endif
++
++        //PRT_DEBUG { printf("\nNODE IS CLIENT: Converting Start Time\n"); }
++        tsc_offset_to_ntp_time(&start_time, start_tsc, &client_nfo);
++        
++        //PRT_DEBUG { printf("\nNODE IS SERVER: Converting Recv Time\n"); }
++        tsc_offset_to_ntp_time(&recv_time, recv_tsc, &server_nfo);
++        
++        //PRT_DEBUG { printf("\nNODE IS SERVER: Converting Xmit Time\n"); }
++        tsc_offset_to_ntp_time(&xmt_time, xmt_tsc, &server_nfo);
++
++        //PRT_DEBUG { printf("\nNODE IS CLIENT: Converting End Time\n"); }
++        tsc_offset_to_ntp_time(&end_time, end_tsc, &client_nfo);
++        
++        /*
++         * Substitute our improved time stamps for NTP's and then let
++         * NTPDATE continue with its standard work.
++         */
++        org               = start_time;
++        rbufp->recv_time  = end_time;
++        rec               = recv_time;
++        server->org       = xmt_time;
++        
++        
++#if DSUI_ENABLED
++        DSTRM_EVENT_DATA(NTPDATE, NTP_START_TIME, rpkt->pkt_id,
++                        strlen(lfptoa(&start_time, 9)), lfptoa(&start_time, 9), "print_string");
++        DSTRM_EVENT_DATA(NTPDATE, NTP_END_TIME, rpkt->pkt_id,
++                        strlen(lfptoa(&end_time, 9)), lfptoa(&end_time, 9), "print_string");
++        DSTRM_EVENT_DATA(NTPDATE, NTP_RECV_TIME, rpkt->pkt_id,
++                        strlen(lfptoa(&recv_time, 9)), lfptoa(&recv_time, 9), "print_string");
++        DSTRM_EVENT_DATA(NTPDATE, NTP_XMT_TIME, rpkt->pkt_id,
++                        strlen(lfptoa(&xmt_time, 9)), lfptoa(&xmt_time, 9), "print_string");
++        DSTRM_EVENT_DATA(NTPDATE, XTIME_START_TIME, rpkt->pkt_id,
++                        sizeof(start_time), &start_time, "print_ntp_time");
++        DSTRM_EVENT_DATA(NTPDATE, XTIME_END_TIME, rpkt->pkt_id,
++                        sizeof(end_time), &end_time, "print_ntp_time");
++        DSTRM_EVENT_DATA(NTPDATE, XTIME_RECV_TIME, rpkt->pkt_id,
++                        sizeof(recv_time), &recv_time, "print_ntp_time");
++        DSTRM_EVENT_DATA(NTPDATE, XTIME_XMT_TIME, rpkt->pkt_id,
++                        sizeof(xmt_time), &xmt_time, "print_ntp_time");
++#endif
++
++#endif /* NEW_NTP_CHANGES */
++
+ 	/*
+ 	 * Calculate the round trip delay (di) and the clock offset (ci).
+ 	 * We use the equations (reordered from those in the spec):
+@@ -889,9 +1234,23 @@
+ 	t10 = server->org;		/* pkt.xmt == t1 */
+ 	L_SUB(&t10, &rbufp->recv_time); /* recv_time == t0*/
+ 
++#ifdef NEW_NTP_CHANGES
++#if DSUI_ENABLED
++        DSTRM_EVENT_DATA(NTPDATE, T1_T0, rpkt->pkt_id,
++                        strlen(lfptoa(&t10, 9)), lfptoa(&t10, 9), "print_string");
++#endif
++#endif
++
+ 	t23 = rec;			/* pkt.rec == t2 */
+ 	L_SUB(&t23, &org);		/* pkt->org == t3 */
+ 
++#ifdef NEW_NTP_CHANGES
++#if DSUI_ENABLED
++        DSTRM_EVENT_DATA(NTPDATE, T2_T3, rpkt->pkt_id,
++                        strlen(lfptoa(&t23, 9)), lfptoa(&t23, 9), "print_string");
++#endif
++#endif
++
+ 	/* now have (t2 - t3) and (t0 - t1).	Calculate (ci) and (di) */
+ 	/*
+ 	 * Calculate (ci) = ((t1 - t0) / 2) + ((t2 - t3) / 2)
+@@ -908,6 +1267,12 @@
+ 	 * to an s_fp.
+ 	 */
+ 	L_SUB(&t23, &t10);
++#ifdef NEW_NTP_CHANGES
++#if DSUI_ENABLED
++        DSTRM_EVENT_DATA(NTPDATE, NTP_RAW_DELAY, rpkt->pkt_id,
++                        strlen(lfptoa(&t23, 9)), lfptoa(&t23, 9), "print_string");
++#endif
++#endif
+ 	di = LFPTOFP(&t23);
+ 
+ 	if (debug > 3)
+@@ -926,7 +1291,30 @@
+ 	/*
+ 	 * Shift this data in, then transmit again.
+ 	 */
++#ifdef NEW_NTP_CHANGES
++        /*
++         * FIXME: If we have more servers, verify that this method of
++         * tacking on the end tsc value to the paritcular offset that
++         * gets selected by ntpdate.
++         * 
++         * this will record, for this server, the ending tsc value
++         * associated with this particular round trip. this eliminates
++         * the use of the original global_end_tsc value.
++         *
++         * previously the last rpkt->end_ts was used as the ending tsc
++         * value no matter what particular delay was chosen by
++         * ntpdate.
++         */
++#if DSUI_ENABLED
++        DSTRM_EVENT_DATA(NTPDATE, NTP_OFFSET, rpkt->pkt_id,
++                        strlen(lfptoa(&ci, 9)), lfptoa(&ci, 9), "print_string");
++        DSTRM_EVENT_DATA(NTPDATE, NTP_DELAY, rpkt->pkt_id,
++                        strlen(fptoa(di, 9)), fptoa(di, 9), "print_string");
++#endif
++        server_data(server, (s_fp) di, &ci, 0, rpkt->end_ts);
++#else
+ 	server_data(server, (s_fp) di, &ci, 0);
++#endif
+ 	transmit(server);
+ }
+ 
+@@ -934,6 +1322,16 @@
+ /*
+  * server_data - add a sample to the server's filter registers
+  */
++#ifdef NEW_NTP_CHANGES
++static void
++server_data(
++        register struct server *server,
++        s_fp d,
++        l_fp *c,
++        u_fp e,
++        unsigned long long end_tsc
++        )
++#else
+ static void
+ server_data(
+ 	register struct server *server,
+@@ -941,6 +1339,7 @@
+ 	l_fp *c,
+ 	u_fp e
+ 	)
++#endif
+ {
+ 	u_short i;
+ 
+@@ -950,6 +1349,9 @@
+ 		server->filter_offset[i] = *c;
+ 		server->filter_soffset[i] = LFPTOFP(c);
+ 		server->filter_error[i] = e;
++#ifdef NEW_NTP_CHANGES
++                server->filter_endtsc[i] = end_tsc;
++#endif
+ 		server->filter_nextpt = (u_short)(i + 1);
+ 	}
+ }
+@@ -998,9 +1400,15 @@
+ 		L_CLR(&server->offset);
+ 		server->soffset = 0;
+ 		server->dispersion = PEER_MAXDISP;
++#ifdef NEW_NTP_CHANGES
++                server->end_tsc = 0;
++#endif
+ 	} else {
+ 		register s_fp d;
+ 
++#ifdef NEW_NTP_CHANGES
++                server->end_tsc = server->filter_endtsc[ord[0]];
++#endif
+ 		server->delay = server->filter_delay[ord[0]];
+ 		server->offset = server->filter_offset[ord[0]];
+ 		server->soffset = LFPTOFP(&server->offset);
+@@ -1258,16 +1666,33 @@
+ 
+ 	for (sp = sys_servers; sp != NULL; sp = sp->next_server)
+ 		clock_filter(sp);
++
++        /* 
++         * Chooses the server with whose offset the local system clock
++         * should be adjusted. In our case, no server is chosen because
++         * the strata for our modified server is too high. This is does
++         * not affect us since we not using the regular
++         */
+ 	server = clock_select();
+ 
++#ifdef NEW_NTP_CHANGES
++        /* 
++         * This will cause us to print out the current offset values
++         * we're interested in by calling printserver below.
++         */
++        debug = 1;
++#endif
++
+ 	if (debug || simple_query) {
+ 		for (sp = sys_servers; sp != NULL; sp = sp->next_server)
+ 			printserver(sp, stdout);
+ 	}
+ 
+ 	if (server == 0) {
++#ifndef NEW_NTP_CHANGES
+ 		msyslog(LOG_ERR,
+ 			"no server suitable for synchronization found");
++#endif
+ 		return(1);
+ 	}
+ 
+@@ -1362,11 +1787,18 @@
+ 	memset(&hints, 0, sizeof(hints));
+ 	hints.ai_family = ai_fam_templ;
+ 	hints.ai_socktype = SOCK_DGRAM;
+-
++#ifndef NEW_NTP_CHANGES
++        /*
++         * FIXME: with shared memory for comm., these print outs are
++         * probably fine. HARI had this changed because he captured
++         * standard out, but now they are left out just to remove some
++         * clutter.
++         */
+ #ifdef DEBUG
+ 	if (debug)
+ 		printf("Looking for host %s and service %s\n", serv, service);
+ #endif
++#endif
+ 
+ 	error = getaddrinfo(serv, service, &hints, &addrResult);
+ 	if (error != 0) {
+@@ -1383,11 +1815,19 @@
+ 		msyslog(LOG_ERR, "can't find host %s\n", serv);
+ 		return;
+ 	}
++#ifndef NEW_NTP_CHANGES
++        /*
++         * FIXME: with shared memory for comm., these print outs are
++         * probably fine. HARI had this changed because he captured
++         * standard out, but now they are left out just to remove some
++         * clutter.
++         */
+ #ifdef DEBUG
+ 	else if (debug) {
+ 		fprintf(stderr, "host found : %s\n", stohost((struct sockaddr_storage*)addrResult->ai_addr));
+ 	}
+ #endif
++#endif
+ 
+ 	/* We must get all returned server in case the first one fails */
+ 	for (ptr = addrResult; ptr != NULL; ptr = ptr->ai_next) {
+@@ -2152,6 +2592,19 @@
+ 	char junk[5];
+ 	char *str;
+ 
++#ifdef NEW_NTP_CHANGES
++        if (pp->end_tsc == 0) {
++                fprintf(stderr, "ku_ntpdate: %s does not seem to be running our modified NTP server.\n",ntoa(&pp->srcadr));
++        }
++
++        (void) fprintf(fp, "server %s stratum %d offset %s tsc %Lu delay %s dispersion %s\n",
++                       ntoa(&pp->srcadr), pp->stratum,
++                       lfptoa(&pp->offset, 9), pp->end_tsc, fptoa((s_fp)pp->delay, 9),
++                       ufptoa(pp->rootdispersion, 9));
++
++        return;
++#endif
++
+ 	if (!debug) {
+ 		(void) fprintf(fp, "server %s, stratum %d, offset %s, delay %s\n",
+ 				   stoa(&pp->srcadr), pp->stratum,
+diff -u -r -N -b --exclude-from=diff-exclude ntp-ref/ntpdate/ntpdate.h ntp-work/ntpdate/ntpdate.h
+--- ntp-ref/ntpdate/ntpdate.h	2004-02-24 23:58:18.000000000 -0600
++++ ntp-work/ntpdate/ntpdate.h	2009-10-30 08:29:46.000000000 -0500
+@@ -35,6 +35,10 @@
+ 	l_fp filter_offset[NTP_SHIFT];	/* offset part of shift register */
+ 	s_fp filter_soffset[NTP_SHIFT]; /* offset in s_fp format, for disp */
+ 	u_fp filter_error[NTP_SHIFT];	/* error part of shift register */
++#ifdef NEW_NTP_CHANGES
++        unsigned long long filter_endtsc[NTP_SHIFT];
++        unsigned long long end_tsc;
++#endif
+ 	l_fp org;			/* peer's originate time stamp */
+ 	l_fp xmt;			/* transmit time stamp */
+ 	u_fp delay;			/* filter estimated delay */
+@@ -92,7 +96,11 @@
+  * Some defaults
+  */
+ #define	DEFTIMEOUT	5		/* 5 timer increments */
++#ifdef NEW_NTP_CHANGES
++#define DEFSAMPLES  8
++#else
+ #define	DEFSAMPLES	4		/* get 4 samples per server */
++#endif
+ #define	DEFPRECISION	(-5)		/* the precision we claim */
+ #define	DEFMAXPERIOD	60		/* maximum time to wait */
+ #define	DEFMINSERVERS	3		/* minimum responding servers */

@@ -1,0 +1,124 @@
+Created by PLY version 3.2 (http://www.dabeaz.com/ply)
+
+Unused terminals:
+
+    ACCENT
+    FORWARD_SLASH
+    MINUS
+    QUOTE
+    TILDA
+    PLUS
+    TAB
+    ATSIGN
+    ASTERISK
+    BACK_SLASH
+    PERIOD
+    AMPERSAND
+    DOLLARSIGN
+
+Grammar
+
+Rule 0     S' -> target_defn
+Rule 1     target_defn -> NAME COLON
+Rule 2     config_defn -> topdict_list
+Rule 3     topdict_list -> topdict_list topdict_defn
+Rule 4     topdict_list -> topdict_defn
+Rule 5     topdict_list -> empty
+Rule 6     topdict_defn -> LEFT_ANGLE NAME RIGHT_ANGLE dict_elem_list
+Rule 7     dict_defn -> LEFT_BRACE dict_elem_list RIGHT_BRACE
+Rule 8     dict_elem_list -> dict_elem_list dict_member_defn
+Rule 9     dict_elem_list -> dict_member_defn
+Rule 10    dict_elem_list -> empty
+Rule 11    dict_member_defn -> NAME EQUAL data_defn
+Rule 12    list_defn -> LEFT_SQUARE list_elem_list RIGHT_SQUARE
+Rule 13    list_elem_list -> list_elem_list COMMA data_defn
+Rule 14    list_elem_list -> list_elem_list data_defn
+Rule 15    list_elem_list -> data_defn
+Rule 16    list_elem_list -> empty
+Rule 17    tuple_defn -> NAME LEFT_PAREN dict_elem_list RIGHT_PAREN
+Rule 18    data_defn -> NAME
+Rule 19    data_defn -> NUMBER
+Rule 20    data_defn -> string
+Rule 21    data_defn -> tuple_defn
+Rule 22    data_defn -> list_defn
+Rule 23    data_defn -> dict_defn
+Rule 24    string -> STRING_LITERAL
+Rule 25    empty -> <empty>
+
+Terminals, with rules where they appear
+
+ACCENT               : 
+AMPERSAND            : 
+ASTERISK             : 
+ATSIGN               : 
+BACK_SLASH           : 
+COLON                : 1
+COMMA                : 13
+DOLLARSIGN           : 
+EQUAL                : 11
+FORWARD_SLASH        : 
+LEFT_ANGLE           : 6
+LEFT_BRACE           : 7
+LEFT_PAREN           : 17
+LEFT_SQUARE          : 12
+MINUS                : 
+NAME                 : 1 6 11 17 18
+NUMBER               : 19
+PERIOD               : 
+PLUS                 : 
+QUOTE                : 
+RIGHT_ANGLE          : 6
+RIGHT_BRACE          : 7
+RIGHT_PAREN          : 17
+RIGHT_SQUARE         : 12
+STRING_LITERAL       : 24
+TAB                  : 
+TILDA                : 
+error                : 
+
+Nonterminals, with rules where they appear
+
+config_defn          : 
+data_defn            : 11 13 14 15
+dict_defn            : 23
+dict_elem_list       : 6 7 8 17
+dict_member_defn     : 8 9
+empty                : 5 10 16
+list_defn            : 22
+list_elem_list       : 12 13 14
+string               : 20
+target_defn          : 0
+topdict_defn         : 3 4
+topdict_list         : 2 3
+tuple_defn           : 21
+
+Parsing method: LALR
+
+state 0
+
+    (0) S' -> . target_defn
+    (1) target_defn -> . NAME COLON
+
+    NAME            shift and go to state 2
+
+    target_defn                    shift and go to state 1
+
+state 1
+
+    (0) S' -> target_defn .
+
+
+
+state 2
+
+    (1) target_defn -> NAME . COLON
+
+    COLON           shift and go to state 3
+
+
+state 3
+
+    (1) target_defn -> NAME COLON .
+
+    $end            reduce using rule 1 (target_defn -> NAME COLON .)
+

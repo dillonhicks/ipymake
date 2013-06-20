@@ -1,0 +1,9 @@
+#!/usr/bin/python
+
+from pygsched import gschedapi
+
+fd = gschedapi.grp_open()
+ret = gschedapi.gsched_uninstall_group(fd, "safety_mem")
+print ret
+ret = gschedapi.grp_destroy_group(fd, "safety")
+print ret

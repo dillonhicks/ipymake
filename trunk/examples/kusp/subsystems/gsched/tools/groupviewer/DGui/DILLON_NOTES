@@ -1,0 +1,13 @@
+Built in type support
+bool -- Done
+int -- Done
+long -- Combined With Int
+float -- Done
+str -- Done
+list
+dict
+tuple
+
+GSH DataStructures
+*Groups => Dictionaries
+*Tasks => Stuff

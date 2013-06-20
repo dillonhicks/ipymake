@@ -1,0 +1,23 @@
+AUTHOR: DILLON HICKS
+
+KUSP UNIT AND REGRESSION TESTS
+
+These tests are meant to give more information about potential
+problems before they occur. Since I have been the one in charge of
+maintaining some order in the software tree I whole-heartedly believe
+that the time has come for a series of simple tests that we can run
+after a successful install of our software. In the long run it would
+be nice to see these tests also decent unit tests, but for now
+regression tests are quite useful as we are still trying to stabilize
+our software tree since the CMake conversion.
+
+In the first iteration of these tests, it will primarily focus on
+giving feedback about the Python modules. First and foremost an easy
+test to accomplish is seeing if the modules installed properly with an
+import test. Then after an import tests we can develop some use
+testing. Since we already have experiments and other code that use
+Python modules, I think this will be trivial as well.
+
+The second iteration will focus on directly testing the library code
+using C as a sanity check. The problem here is that the libraries also
+use the kernel as well. 

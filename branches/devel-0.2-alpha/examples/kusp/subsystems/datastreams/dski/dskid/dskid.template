@@ -1,0 +1,142 @@
+<root>
+types = [dictionary]
+dictionary_keys = {
+	dski = dski, 
+	dski_enabled = dski_enabled
+}
+options = [opt1, opt2]
+variables = [
+	dski_enabled,
+	dski.pids,
+	dski.child,
+	dski.duration,
+	dski.snapshot_freq,
+	dski.verbose,
+	dski.output_file,
+	dski.kernel,
+	cpu_usage,
+	cpu_usage.pid_list,
+	cpu_usage.name_list,
+	groupsched,
+	groupsched.ssdf,
+	groupsched.pause
+]
+
+# -- ENABLED ENTITIES --
+
+<dski_enabled>
+desc = "Enabled families"
+typse = [dictionary]
+dictionary_members = [
+	{ 
+		desc = "true/false to globally enable entities in a family"
+		typse = [boolean]
+	},
+	{
+		desc = "List of enabled entities within a family"
+		types = [list]
+		members = [string, histogram]
+	}
+]
+
+<histogram>
+desc = "Histogram invocation"
+types = [invocation]
+invocation_keys = {
+	min = histogram.min,
+	max = histogram.max,
+	buckets = histogram.buckets
+}
+
+<histogram.min>
+types = [long]
+desc = "Minimum value to store in histogram"
+
+<histogram.max>
+types = [long]
+desc = "Maximum value to store in histogram"
+
+<histogram.buckets>
+types = [long]
+desc = "Number of buckets to subdivide histogram"
+
+# -- DSKI DAEMON OPTIONS --
+
+<dski>
+desc = "DSKI Daemon Parameters"
+type = dictionary
+dictionary_keys = {
+	pids = {
+		types = [list]
+		list_members = [int]
+		desc = "List of pids to filter entities on"
+		default = []
+	}
+	child = {
+		types = [string]
+		desc = "Child process to run during logging"
+		default = ""
+	}
+	duration = {
+		types = [int]
+		desc = "period (in seconds) to log events, 0 logs forever"
+		default = 0
+	}
+	snapshot_freq = {
+		types = [int]
+		desc = "if nonzero, period (in seconds) to take snapshots of histograms and counters"
+		default = 0
+	}
+	verbose = {
+		types = [boolean]
+		desc = "if nonzero, period (in seconds) to take snapshots of histograms and counters"
+		default = false
+	}
+	cpu_usage = cpu_usage
+	groupsched = groupsched
+	output_file = {
+		types = [string]
+		desc = "output file to write events"
+	}
+	kernel = {
+		types = [string]
+		desc = "path to LIBERTOS kernel"
+	}
+}
+
+<cpu_usage>
+desc = "CPU usage tracking filter; set to false to disable"
+types = [dictionary, boolean]
+default = false
+dictionary_keys = {
+	pid_list = {
+		types = [list]
+		list_members = [int]
+		desc = "list of pids for cpu usage filter to track"
+		default = []
+	}
+	name_list = {
+		types = [list]
+		list_members = [string]
+		desc = "list of pids by name for cpu usage filter to track"
+		default = []
+	}
+}
+
+<groupsched>
+desc = "Place DSKI threads under Group Scheduling control"
+types = [dictionary, boolean]
+default = false
+dictionary_keys = {
+	ssdf = {
+		types = [int]
+		desc = "group id of existing SSDF"
+		default = -1
+	}
+	pause = {
+		types = [boolean]
+		desc = "pause after logging events before removing groupsched config"
+		default = false
+	}
+}
+

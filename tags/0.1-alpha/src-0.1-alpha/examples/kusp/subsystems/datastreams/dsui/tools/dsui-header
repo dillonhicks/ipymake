@@ -1,0 +1,611 @@
+#!/usr/bin/env python
+
+global Params
+global prefix
+headerversion = 5
+
+# Part 1 of the body of the older, explicitly mapped
+# version of the generated prefix_dsui.c file
+source_noip_template_part1 = """
+#ifdef CONFIG_DSUI
+#include "PREFIX_dsui.h"
+#include <dsui.h>
+#include <stdlib.h>
+"""
+
+# Part 2 of the body of the older, explicitly mapped
+# version of the generated prefix_dsui.c file
+source_noip_template_part2 = """
+static void PREFIX_dsui_register() __attribute__ ((constructor));
+
+static void PREFIX_dsui_register()
+{
+    int i;
+    dsui_header_check("""+`headerversion`+""", "PREFIX");
+
+    for(i=0; i < dsui_iparray_size; i++) {
+        dsui_register_ip(dsui_iparray[i]);
+    }
+}
+
+#endif // CONFIG_DSUI
+"""
+
+# A part of the body of the older, explicitly mapped
+# version of the generated prefix_dsui.h file
+source_noip_entity = """
+struct datastream_ip_data __datastream_ip_data_$GROUP$$NAME$ = 
+{                
+    \"$GROUP$\",        
+    \"$NAME$\",        
+    \"$EDF$\",        
+    "",            
+    "",            
+    0,            
+    $TYPEMACRO$,        
+    {NULL, NULL},         
+    0,             
+    NULL,            
+    {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL}
+};
+
+struct datastream_ip __datastream_ip_$GROUP$$NAME$ =
+{
+    &__datastream_ip_data_$GROUP$$NAME$,
+    &__datastream_ip_data_$GROUP$$NAME$.next,
+    &__datastream_ip_data_$GROUP$$NAME$.id
+};
+"""
+
+# A part of the body of the older, explicitly mapped
+# version of the generated prefix_dsui.h file
+header_noip_entity = """extern struct datastream_ip __datastream_ip_$GROUP$$NAME$;
+"""
+
+# Part 1 of the body of the older, explicitly mapped
+# version of the generated prefix_dsui.c file
+header_noip_template_part1 = """
+#ifndef PREFIX_LOCAL_DSUI_H
+#define PREFIX_LOCAL_DSUI_H
+
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#ifndef HAVE_LIBDSUI
+#undef CONFIG_DSUI
+#warning libdsui not installed, DSUI disabled
+#endif
+#endif
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#ifdef CONFIG_DSUI
+#include <dsui.h>
+
+#define DSUI_BEGIN(argcp, argvp) \\
+    dsui_start((argcp), (argvp), "/tmp/PREFIX.dsui.bin");
+#define DSUI_CLEANUP() dsui_cleanup()
+#define DSUI_START() DSUI_BEGIN(NULL, NULL);
+#define DSUI_SIGNAL(a, b) dsui_signal((a),(b))
+#define DSTRM_PRINTF dsui_printf
+
+
+#define DSTRM_EVENT_DATA(gname, ename, tag, data_len, data, edfname) \\
+    if (*__datastream_ip_##gname##ename.next) \\
+        dsui_event_log(&__datastream_ip_##gname##ename,    \\
+                tag, data_len, data);            
+#define DSTRM_COUNTER_DECL(gname, ename)
+#define DSTRM_INTERVAL_DECL(gname, ename)
+#define DSTRM_HISTOGRAM_DECL(gname, ename)
+"""
+
+# Part 2 of the body of the older, explicitly mapped
+# version of the generated prefix_dsui.c file
+header_noip_template_part2 = """
+#else
+
+#define DSTRM_EVENT_DATA(gname, ename, tag, data_len, data, edfname)
+#define DSTRM_EVENT(gname, ename, tag)
+#define DSTRM_COUNTER_DECL(gname, ename)
+#define DSTRM_COUNTER_ADD(gname, ename, amount)
+#define DSTRM_COUNTER_LOG(gname, ename)
+#define DSTRM_COUNTER_RESET(gname, ename)
+#define DSTRM_INTERVAL_DECL(gname, ename)
+#define DSTRM_INTERVAL_END(gname, ename, tag)
+#define DSTRM_INTERVAL_START(gname, ename)
+#define DSTRM_HISTOGRAM_DECL(gname, ename)
+#define DSTRM_HISTOGRAM_ADD(gname, ename, amount)
+#define DSTRM_HISTOGRAM_LOG(gname, ename)
+#define DSTRM_HISTOGRAM_RESET(gname, ename)
+#define DSTRM_PRINTF
+#define DSUI_BEGIN(x,y)        NULL
+#define DSUI_START()        NULL
+#define DSUI_CLEANUP()
+#define DSUI_SIGNAL(a, b)    signal((a),(b))
+#endif // CONFIG_DSUI
+#ifdef __cplusplus
+}
+#endif
+#endif
+"""
+
+# The body of the 'compiler trick' version of the 
+# generated prefix_dsui.c file
+source_ip_template = """
+#ifdef CONFIG_DSUI
+
+#include "PREFIX_dsui.h"
+#include <dsui.h>
+#include <stdlib.h>
+
+static void PREFIX_dsui_register() __attribute__ ((constructor));
+
+static void PREFIX_dsui_register()
+{
+    dsui_header_check("""+`headerversion`+""", "PREFIX");
+    struct datastream_ip *ip;
+    
+    for (ip = __start___PREFIX_datastream_ips;
+            ip != __stop___PREFIX_datastream_ips; ip++) {
+        dsui_register_ip(ip);
+    }
+}
+#endif
+"""
+
+# The body of the 'compiler trick' version of the 
+# generated prefix_dsui.h file
+header_ip_template = """
+#ifndef PREFIX_LOCAL_DSUI_H
+#define PREFIX_LOCAL_DSUI_H
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#ifdef CONFIG_DSUI
+#include <dsui.h>
+
+extern struct datastream_ip __start___PREFIX_datastream_ips[];
+extern struct datastream_ip __stop___PREFIX_datastream_ips[];
+
+#define DSUI_BEGIN(argcp, argvp) \\
+    dsui_start((argcp), (argvp), "/tmp/PREFIX.dsui.bin");
+#define DSUI_CLEANUP() dsui_cleanup()
+#define DSUI_START() DSUI_BEGIN(NULL, NULL);
+#define DSUI_SIGNAL(a, b) dsui_signal((a),(b))
+#define DSTRM_PRINTF dsui_printf
+
+
+#define DSTRM_EVENT_DATA(gname, ename, tag, data_len, data, edfname) do {    \\
+    static struct datastream_ip_data __datastream_ip_data_##gname##ename =    \\
+    {                                    \\
+        #gname,            \\
+        #ename,                \\
+        edfname,                        \\
+        __FILE__,                        \\
+        __func__,                        \\
+        __LINE__,                        \\
+        DS_EVENT_TYPE,                    \\
+        {NULL, NULL}, \\
+        0, \\
+        NULL,                            \\
+        {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL} \\
+    };                            \\
+    static struct datastream_ip __datastream_ip_##gname##ename    \\
+    __attribute__((section("__PREFIX_datastream_ips"), aligned(8))) =            \\
+    {                                    \\
+        &__datastream_ip_data_##gname##ename,            \\
+        &__datastream_ip_data_##gname##ename.next,        \\
+        &__datastream_ip_data_##gname##ename.id        \\
+    };                                    \\
+    if (*__datastream_ip_##gname##ename.next)                \\
+        dsui_event_log(&__datastream_ip_##gname##ename,        \\
+                tag, data_len, data);                \\
+} while (0)
+
+#define DSTRM_EVENT_DATA_ID(id, gname, ename, tag, data_len, data, edfname) do {    \\
+    static struct datastream_ip_data __datastream_ip_data_##gname##ename =    \\
+    {                                    \\
+        #gname,            \\
+        #ename,                \\
+        edfname,                        \\
+        __FILE__,                        \\
+        __func__,                        \\
+        __LINE__,                        \\
+        DS_EVENT_TYPE,                    \\
+        {NULL, NULL}, \\
+        0, \\
+        NULL,                            \\
+        {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL} \\
+    };                            \\
+    static struct datastream_ip __datastream_ip_##gname##ename    \\
+    __attribute__((section("__PREFIX_datastream_ips"), aligned(8))) =            \\
+    {                                    \\
+        &__datastream_ip_data_##gname##ename,            \\
+        &__datastream_ip_data_##gname##ename.next,        \\
+        &__datastream_ip_data_##gname##ename.id        \\
+    };                                    \\
+    if (*__datastream_ip_##gname##ename.next)                \\
+        dsui_event_log_single(&__datastream_ip_##gname##ename, (id),    \\
+                tag, data_len, data);                \\
+} while (0)
+
+#define DSTRM_COUNTER_DECL(gname, ename)                    \\
+    static struct datastream_ip_data __datastream_ip_data_##gname##ename = \\
+    {    \\
+        #gname,            \\
+        #ename,                \\
+        "",                        \\
+        __FILE__,                        \\
+        "",                        \\
+        __LINE__,                        \\
+        DS_COUNTER_TYPE,                    \\
+        {NULL, NULL}, \\
+        0, \\
+        NULL,                            \\
+        {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL} \\
+    };                                    \\
+    struct datastream_ip __datastream_ip_##gname##ename        \\
+    __attribute__((section("__PREFIX_datastream_ips"), aligned(8))) =            \\
+    {                                    \\
+        &__datastream_ip_data_##gname##ename,            \\
+        &__datastream_ip_data_##gname##ename.next,        \\
+        &__datastream_ip_data_##gname##ename.id        \\
+    };                                    
+
+#define DSTRM_INTERVAL_DECL(gname, ename)                    \\
+    static struct datastream_ip_data __datastream_ip_data_##gname##ename = \\
+    {                                    \\
+        #gname,            \\
+        #ename,                \\
+        "",                        \\
+        __FILE__,                        \\
+        "",                        \\
+        __LINE__,                        \\
+        DS_INTERVAL_TYPE,                    \\
+        {NULL, NULL},                     \\
+        0,                         \\
+        NULL,                            \\
+        {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL} \\
+    };                                    \\
+    struct datastream_ip __datastream_ip_##gname##ename        \\
+    __attribute__((section("__PREFIX_datastream_ips"), aligned(8))) =            \\
+    {                                    \\
+        &__datastream_ip_data_##gname##ename,        \\
+        &__datastream_ip_data_##gname##ename.next,        \\
+        &__datastream_ip_data_##gname##ename.id        \\
+    };                                    \\
+
+#define DSTRM_HISTOGRAM_DECL(gname, ename)                    \\
+    static struct datastream_ip_data __datastream_ip_data_##gname##ename = \\
+    {                                    \\
+        #gname,            \\
+        #ename,                \\
+        "",                        \\
+        __FILE__,                        \\
+        "",                        \\
+        __LINE__,                        \\
+        DS_HISTOGRAM_TYPE,                    \\
+        {NULL, NULL},                     \\
+        0,                         \\
+        NULL,                            \\
+        {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL} \\
+    };                                \\
+    struct datastream_ip __datastream_ip_##gname##ename        \\
+    __attribute__((section("__PREFIX_datastream_ips"), aligned(8))) =            \\
+    {                                    \\
+        &__datastream_ip_data_##gname##ename,        \\
+        &__datastream_ip_data_##gname##ename.next,        \\
+        &__datastream_ip_data_##gname##ename.id        \\
+    };                                    \\
+
+#else
+
+#define DSTRM_EVENT_DATA(gname, ename, tag, data_len, data, edfname)
+#define DSTRM_EVENT(gname, ename, tag)
+#define DSTRM_COUNTER_DECL(gname, ename)
+#define DSTRM_COUNTER_ADD(gname, ename, amount)
+#define DSTRM_COUNTER_LOG(gname, ename)
+#define DSTRM_COUNTER_RESET(gname, ename)
+#define DSTRM_INTERVAL_DECL(gname, ename)
+#define DSTRM_INTERVAL_END(gname, ename, tag)
+#define DSTRM_INTERVAL_START(gname, ename)
+#define DSTRM_HISTOGRAM_DECL(gname, ename)
+#define DSTRM_HISTOGRAM_ADD(gname, ename, amount)
+#define DSTRM_HISTOGRAM_LOG(gname, ename)
+#define DSTRM_HISTOGRAM_RESET(gname, ename)
+#define DSTRM_PRINTF
+#define DSUI_BEGIN(x,y)        NULL
+#define DSUI_START()        NULL
+#define DSUI_CLEANUP()
+#define DSUI_SIGNAL(a, b)    signal((a),(b))
+#endif // CONFIG_DSUI
+#ifdef __cplusplus
+}
+#endif
+#endif
+"""
+
+
+def write_magic_c_header(prefix):
+    """
+    Write out the prefix_dsui.h and prefix_dsui.c files for 
+    the 'compiler trick' version. Note that the replace operations
+    on the two template strings substitutes the PREFIX place holder
+    with the specified with the specified name of the application.
+    """
+    header = open(prefix+"_dsui.h", "w")
+    source = open(prefix+"_dsui.c", "w")
+
+    t1 = header_ip_template.replace("PREFIX", prefix)
+    t2 = source_ip_template.replace("PREFIX", prefix)
+
+    header.write(t1)
+    source.write(t2)
+
+    header.close()
+    source.close()
+    if Params.verbose_level >= 1:
+        print """
+Two files have been generated, """+prefix+"""_dsui.c and """+prefix+"""_dsui.h"
+You should include the header file in any source that needs to define
+instrumentation points. You should also compile and link the .c file.
+
+If your application uses DSUI functions but does not define any
+instrumentation points, do not link the .c file or else you will get
+linker errors."""
+
+def write_magic_c_header_with_full_path(fullPath,prefix):
+    """
+    Write out the prefix_dsui.h and prefix_dsui.c files for 
+    the 'compiler trick' version, stating the full path to the
+    desired location of the created files.
+    """
+    header = open(fullPath+prefix+"_dsui.h", "w")
+    source = open(fullPath+prefix+"_dsui.c", "w")
+
+    t1 = header_ip_template.replace("PREFIX", prefix)
+    t2 = source_ip_template.replace("PREFIX", prefix)
+
+    header.write(t1)
+    source.write(t2)
+
+    header.close()
+    source.close()
+    if Params.verbose_level >= 1:
+        print """\n Full path Prefix is being Used.......\n """
+        print """
+Two files have been generated, """+prefix+"""_dsui.c and """+prefix+"""_dsui.h"
+You should include the header file in any source that needs to define
+instrumentation points. You should also compile and link the .c file.
+
+If your application uses DSUI functions but does not define any
+instrumentation points, do not link the .c file or else you will get
+linker errors."""
+
+def write_c_header_with_ns(prefix, ns):
+    """
+    Write out the prefix_dsui.h and prefix_dsui.c files for 
+    the explicitly specified namespace mapping version.
+    """
+    header = open(prefix+"_dsui.h", "w")
+    source = open(prefix+"_dsui.c", "w")
+
+    t1 = header_noip_template_part1.replace("PREFIX", prefix)
+    t2 = source_noip_template_part1.replace("PREFIX", prefix)
+    
+    header.write(t1)
+    source.write(t2)
+
+    for entity in ns.values():
+        edf = ""
+        ename = entity.get_name()
+        fname = entity.get_family()
+        if entity.get_type() == namespaces.EVENTTYPE:
+            tname = "DS_EVENT_TYPE"
+            edf = entity.get_edf()
+        elif entity.get_type() == namespaces.HISTOGRAMTYPE:
+            tname = "DS_HISTOGRAM_TYPE"
+            edf = entity.get_units()
+        elif entity.get_type() == namespaces.COUNTERTYPE:
+            tname = "DS_COUNTER_TYPE"
+        else:
+            tname = "DS_INTERVAL_TYPE"
+
+        t1 = header_noip_entity.replace("$GROUP$", fname)
+        t1 = t1.replace("$NAME$", ename)
+
+        t2 = source_noip_entity.replace("$GROUP$", fname)
+        t2 = t2.replace("$NAME$", ename)
+        t2 = t2.replace("$TYPEMACRO$", tname)
+        t2 = t2.replace("$EDF$", edf)
+
+        header.write(t1)
+        source.write(t2)
+
+    source.write("static struct datastream_ip *dsui_iparray[] = {\n")
+    for entity in ns.values():
+        source.write("\t&__datastream_ip_"+entity.get_family()+
+                entity.get_name() + ",\n")
+    source.write("\tNULL\n};\n")
+    source.write("static int dsui_iparray_size = "+`len(ns)`+";\n")
+
+    
+    header.write(header_noip_template_part2)
+    source.write(source_noip_template_part2.replace("PREFIX",prefix))
+
+    header.close()
+    source.close()
+
+
+if __name__ == "__main__":
+    # imports required if this module is called as a
+    # command
+    import optparse, sys
+    from pprint import *
+
+    # Define the set of permitted parameters, including the
+    # command arguments.  The initialization method creates
+    # the parser and defines the defaults. The parse()
+    # method actually parses the arguments one the command
+    # line. This was done so that the instance of the class
+    # could be global and thus available to all
+    # routines. and then parse the arguments to this call
+    # according to the specification
+    class Params_Set:
+        USAGE = "usage: %prog [options]"
+
+        def __init__(self):
+            # Create the argument parser and then tell it
+            # about the set of legal arguments for this
+            # command. The parse() method of this class
+            # calls parse_args of the optparse module
+            self.p = optparse.OptionParser(usage=self.USAGE)
+
+            # Boring and totally standard verbose and
+            # debugging options that should be common to
+            # virtually any command
+            #
+            self.p.add_option("-d", action="store_const", const=1,        
+                              dest="debug_level", 
+                              help="Turn on diagnostic output at level 1")
+            self.p.add_option("-D", action="store", type ="int",    
+                              dest="debug_level", 
+                              help="Turn on diagnostic output at level DEBUG_LEVEL")
+            self.p.add_option("-v", action="store_const", const=1,        
+                              dest="verbose_level", 
+                              help="Turn on narrative output at level 1")
+            self.p.add_option("-V", action="store", type ="int",    
+                              dest="verbose_level", 
+                              help="Turn on narrative output at level VERBOSE_LEVEL")
+            
+            # Command specific options. We can specify a
+            # configuration file to parse, which defaults to
+            # stdin, and an output file name, which defaults
+            # to stdout.
+            self.p.add_option("-o", "--outfile", action="store", type ="string", 
+                              dest="outfile_path", 
+                              help="Output to the file OUTFILE_NAME, instead of <prefix>_dsui")
+            
+            # Adding namespace
+            self.p.add_option("-n", "--namespace", action="store", dest="name_space",
+                                    type="string", help="namespace file to read")
+            
+            # Prefix
+            self.p.add_option("-p", "--prefix", dest="prefix",
+                                    help="Unique name for this application/library")
+            
+            
+            self.p.add_option("--oldc", action="store_const",dest="mode", 
+                              help="Generate old-style C/C++ headers.")
+            
+            
+            # Now tell the parser about the default values of all the options
+            # we just told it about
+            self.p.set_defaults(
+                debug_level     = 0,          
+                verbose_level   = 0,
+                outfile_path    = None,
+                mode            = "newc",
+                prefix          = None,
+                name_space      = None
+                )       
+            
+        def parse(self):
+            self.options, self.args = self.p.parse_args()
+            self.debug_level     = self.options.debug_level    
+            self.verbose_level   = self.options.verbose_level  
+            self.prefix          = self.options.prefix
+            self.outfile_name    = self.options.outfile_path
+            self.mode            = self.options.mode
+            self.name_space      = self.options.name_space
+            
+            # Check to see if  output file name has been
+            # specified. If so, then try to open it, and if that is
+            # successful, replace the default outfile file            
+            if self.outfile_name:
+                try:
+                    tmpf = open(self.outfile_name, 'w')
+                    self.outfile = tmpf
+                except IOError, earg:
+                    print "Error opening Output file: -i %s" % (self.outfile_name)
+                    print "Expection argument:", earg
+
+            # Output option details if debugging level is high enough
+            if self.debug_level >= 3 :
+                print
+                print "Options: ", self.options
+                print "Args: ", self.args
+
+        # Defining this method defines the string representation of the
+        # object when given as an argument to str() or the "print" command
+        def __str__(self):
+            param_print_str = \
+"""Parameters:
+  debug_level    : %d
+  verbose_level  : %d
+  prefix         : %s
+  output_file    : %s
+  mode              : %s
+  namespace          : %s 
+""" 
+
+            str_output = param_print_str % \
+                (
+                self.debug_level,        
+                self.verbose_level,     
+                self.prefix,
+                self.outfile_name,
+                self.mode,
+                self.name_space 
+                )  
+            
+            return str_output
+        
+    def main():
+        # Global level params class instance was
+        # created before calling main(). We make it
+        # global so that other code can access the set
+        # of Parameters, simply by accessing the Params
+        # instance. Here, however, we call the parse()
+        # method to actually get the arguments, since
+        # we have been called from the command line.
+        Params.parse()
+        prefix = Params.prefix
+        debug_level = Params.debug_level
+        if Params.debug_level >= 2:
+            print Params
+    
+        if prefix is None:
+            print "You must specify a file prefix with -p/--prefix <your-prefix>."
+            sys.exit(1)
+        # Name space 
+        #
+        if Params.name_space:
+        	from datastreams import namespaces
+        	ns = namespaces.Namespace()
+        	ns.merge(namespaces.read_namespace_files(Params.name_space))
+
+        # Write output file
+        #
+        if Params.mode == "newc":
+            if Params.outfile_name:
+                write_magic_c_header_with_full_path(Params.outfile_name, prefix)
+            else:
+                write_magic_c_header(prefix)
+        elif Params.mode == "oldc":
+		    write_c_header_with_ns(prefix, ns)
+        else:
+			raise ValueError("Command line argument 'mode' is invalid: "\
+							 "must be \'newc\' or \'oldc\'", Params.mode)
+			sys.exit(2)
+		
+        
+    
+
+    Params = Params_Set()
+    main()

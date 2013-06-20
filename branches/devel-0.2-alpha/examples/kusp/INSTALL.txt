@@ -1,0 +1,83 @@
+INSTALLING KUSP FROM SOURCE
+============================================
+
+
+These instructions assume:
+***************************
+
+1) You are in the same directory as this file (INSTALL.txt)
+2) You have set the following environmental variables in your bashrc
+   by adding the lines:
+
+   export KUSPROOT=<path-to-kusp-source>
+   export KUSPINSTALL=<path-to-desired-install-directory>
+   export KUSPKERNELROOT=<path-to-kusp-kernel-source>
+
+
+STEPS
+*******
+
+1) Create a "build" directory to work in:
+
+$ mkdir build
+$ cd build
+
+2) Run cmake <path to source>
+
+$ cmake .. -DCMAKE_INSTALL_PREFIX=$KUSPINSTALL -DKERNELROOT=$KUSPKERNELROOT
+$ make
+$ make install
+
+3) Now Set the following environmental variables in your bashrc:
+   
+   export PATH=$PATH:$KUSPINSTALL/bin
+   export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$KUSPINSTALL/lib
+   export PYTHONPATH=$PYTHONPATH:$KUSPINSTALL/lib/python<your-version-number>/site-packages
+
+4) Reload your bashrc:
+
+$ . ~/.bashrc
+
+Alternate Source Install 
+----------------------------------
+
+You can replace steps (1) and (2) with:
+
+$ make -f kusp.mk 
+
+If you have the KUSPINSTALL and KERNELROOT environmental variables
+defined. You will still need to complete steps (3) and (4).
+
+
+
+INSTALLING FROM RPM
+===============================
+
+These instructions assume:
+***************************
+
+1) This is on machine running Fedora 10+.
+
+Steps
+************
+
+1) Create a ~/tmp directory.
+
+$ mkdir ~/tmp
+
+2) Check out a copy of the KUSP trunk with the name 'kusp' into that directory:
+
+$ cd ~/tmp
+$ svn co https://subversion.ittc.ku.edu/svn/libertos/kusp/trunk  kusp
+
+3) `cd' into the kusp directory and create the RPM
+
+$ cd kusp
+$ make -f kusp.mk rpm
+
+This will take a minute or two.
+
+4) Install the newly created RPM
+
+$ cd ~/rpmbuild/RPMS/<your-architecture>/
+$ sudo rpm -Uvh kusp<your-version-os-and-arch>.rpm

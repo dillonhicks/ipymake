@@ -1,0 +1,41 @@
+<root>
+types = ["dictionary"]
+opendictdef = @pipeline
+required = true
+
+
+<pipeline>
+types = ["dictionary"]
+dictdef = {
+	filters = {
+		types = ["dictionary"]
+		opendictdef = {
+			types = ["list"]
+			doc = "Sequential list of filters to process data"
+			listdef = {
+				types = ["invocation"]
+			}
+		}
+	}
+	filter_modules = {
+		types = ["list"]
+		listdef = {
+			types = ["string"]
+		}
+		default = []
+	}
+	tee_output = {
+		types = ["boolean"]
+		default = false
+	}
+	debug = {
+		types = ["boolean"]
+		doc = "Print copious debugging information"
+		default = false
+	}
+
+}
+
+<queueparam>
+types = ["dictionary"]
+default = {}

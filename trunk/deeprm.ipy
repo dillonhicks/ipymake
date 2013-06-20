@@ -1,0 +1,30 @@
+import os, re
+
+remove_pattern = r'(.+\.pyc)|(build)|(.+[~])|(ipym[_]\w+\.py)|(ipymake_cache\.db)'
+
+remove_dirs = ['build']
+
+skip_dirs = ['.svn', 'prop-base', 'props', 'text-base', 'tmp']
+
+def gen_removables(curdir=None):
+    if curdir is None:
+        curdir = os.getcwd()
+
+    for curdir, dirs, files in os.walk(curdir):	
+        for d in dirs:
+	    if any(map(lambda rmd: d == rmd, remove_dirs)):
+	       yield os.path.abspath(d)
+	    if not any(map(lambda skip: d == skip, skip_dirs)):
+	       #print d 
+	       #print curdir+'/'+d
+	       #print os.path.join(curdir,d)
+               gen_removables(os.path.join(curdir,d))
+        for f in files:
+            if re.match(remove_pattern, f) and not f.endswith('.svn-base'):
+	        yield os.path.abspath(f)
+
+
+for thing in gen_removables():
+    print thing
+    #print "rm -rfv %s" % thing
+    #!rm -rfv $thing 

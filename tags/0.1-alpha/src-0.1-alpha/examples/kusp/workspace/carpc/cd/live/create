@@ -1,0 +1,6 @@
+#!/bin/bash
+
+sudo rm -rf build
+mkdir build
+cd build
+sudo livecd-creator -c ../carpc.ks --fslabel=CarPC --cache=/var/cache/pungi -v

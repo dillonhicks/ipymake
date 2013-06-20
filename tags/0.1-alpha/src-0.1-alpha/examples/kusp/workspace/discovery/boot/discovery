@@ -1,0 +1,32 @@
+#!/usr/bin/python
+
+from subprocess import *
+import pyccsm.ccsmapi as ccsm
+
+(output, error) = Popen(['/bin/ps', '--no-headers','-eo', 'pid,comm'], shell = False, stdout = PIPE).communicate()
+
+ccsm_fd = ccsm.ccsm_open()
+
+set_name = "system"
+
+ccsm.ccsm_create_set(ccsm_fd, set_name, 0)
+
+for line in output.splitlines():
+    words = line.split()
+
+    pid = words[0]
+    name = words[1]
+
+    # Remove the python interpreter
+    if name == "python":
+        continue
+
+    # Remove the ps command
+    if name == "ps":
+        continue
+
+    ccsm.ccsm_create_component_by_pid(ccsm_fd, name, int(pid))
+
+    ccsm.ccsm_add_member(ccsm_fd, set_name, name)
+
+ccsm.ccsm_close(ccsm_fd)

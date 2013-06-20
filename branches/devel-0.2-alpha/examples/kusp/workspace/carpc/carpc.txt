@@ -1,0 +1,95 @@
+modes
+	driver mode
+		take as little attention from the road as possible
+		simplified interface using pyqt4
+		functions
+			calendar viewing
+			music selection
+			gps
+	passengar mode
+		full desktop
+		functions
+			calendar viewing/editing
+			movie playing
+			music selection
+			web browsing
+			email
+			gps
+
+Features
+	calender reminders based on time
+	store hotel reservation and interact with gps
+	trip organization
+	samba or nfs
+
+display options
+	dual touch screens
+		driver & passenger
+	single touch screen
+		stationary
+		swivel
+	dual/single lcd screens
+	no evidence of support for dual screens in kvm yet
+	can test the dual screen configuration on a desktop
+
+alternative input options to touchscreens
+	driver
+		trackball
+			could be too distracting from the road
+			there is a tendancy to watch the pointer as it moves
+		numeric keypad
+			pressing a key is intantaneous and takes less attention
+				glancing instead of watching
+			options
+				wireless
+					http://www.newegg.com/Product/Product.aspx?Item=N82E16823173008
+				wired
+					http://www.newegg.com/Product/Product.aspx?Item=N82E16834998398
+				
+	passenger
+		wireless options
+			mini keyboard/trackball
+				http://www.newegg.com/Product/Product.aspx?Item=N82E16823126039		
+				http://www.newegg.com/Product/Product.aspx?Item=N82E16823166102
+				http://www.newegg.com/Product/Product.aspx?Item=N82E16823166079
+				http://www.newegg.com/Product/Product.aspx?Item=N82E16823111045
+			mini keyboard/touchpad
+				http://www.newegg.com/Product/Product.aspx?Item=N82E16823111043
+				http://www.newegg.com/Product/Product.aspx?Item=N82E16823166047
+		wired options
+			mini keyboard/trackball
+				http://www.newegg.com/Product/Product.aspx?Item=N82E16823111007
+			mini keyboard/touchpad
+				http://www.newegg.com/Product/Product.aspx?Item=N82E16823111009
+			others available
+
+fedora11 or fedora10
+	 use revisor to create a respin
+
+hardware
+	car pc case
+		hopefully fan less
+		intel atom or via c-7
+		options
+			http://www.newegg.com/Product/ProductList.aspx?Submit=Property&Subcategory=309&Description=&Type=&N=2010030309&srchInDesc=&MinPrice=&MaxPrice=&OEMMark=1&OEMMark=0&PropertyCodeValue=5777%3A40873&PropertyCodeValue=5777%3A46560&PropertyCodeValue=5777%3A44505&PropertyCodeValue=5777%3A48545
+	wireless and wired ethernet
+		test if wireless can connect to the house from the car
+		in-car lan
+			on carpc
+				access point mode
+				multiple ethernet ports
+	bluetooth
+		different bluetooth audio going to different people?
+	12V smart car power supply
+	main disk
+		ssd or magnetic disk?
+			sd card/usb flash drive			
+				ram for /tmp
+				ram for /var/loag
+	gps & maps
+	interface to copy ipod music
+
+f11 or f12 on kusp-smp
+       common kvm location
+	  use vnc to access kvm
+

@@ -1,0 +1,7 @@
+
+[Desktop Entry]
+Type=Application
+Name=gpsdrive
+Exec=driver-mode --gps
+Icon=system-run
+Comment=

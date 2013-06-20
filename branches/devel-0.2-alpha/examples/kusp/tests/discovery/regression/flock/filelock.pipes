@@ -1,0 +1,10 @@
+<main>
+filters = {
+	f1 = [
+		head.input(
+			file = ["data/cpu*.bin"]
+		)
+
+		discovery.dscvr_info()
+	]
+}

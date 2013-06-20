@@ -1,0 +1,161 @@
+#!/usr/bin/env python
+
+import os
+import sys
+
+
+
+# get the names of the lexer and parser modules from the command line,
+lexername = sys.argv[1]
+if len(sys.argv) > 2:
+    parsername = sys.argv[2]
+else:
+    parsername = lexername
+    pass
+
+# if needed, snip off the .py extensions to the arguments
+if parsername.endswith(".py"):
+    parsername = parsername[:-3]
+    pass
+if lexername.endswith(".py"):
+    lexername = lexername[:-3]
+    pass
+
+# import the modules
+
+lexermod = __import__(lexername)
+parsermod = __import__(parsername)
+print lexermod
+print parsermod
+
+
+
+# from lexer module we only need the list of tokens
+tokens = list(lexermod.tokens)
+tokens.sort()
+
+write = sys.stdout.write
+write("tokens\n------\n")
+for token in tokens:
+    name = "t_"+token
+    try:
+        item = getattr(lexermod, name)
+    except Exception:
+        item = "keyword " + token
+        pass
+    
+    if callable(item):
+        write(token+" "*(25-len(token))+"function using r'"+str(item.__doc__)+"'")
+    else:
+        write(token+" "*(25-len(token))+"r'"+str(item)+"'")
+        pass
+    write("\n")
+    pass
+write("\ngrammar\n-------\n")
+
+# parser analysis phase
+
+bnf = {} # datastructure to hold BNF
+
+rhstracker = [] # keep track of tokens/definitions actually used
+
+# from parser module we need all the parser functions,
+# which are the ones that begin with p_
+functions = [name for name in dir(parsermod)
+             if name.startswith("p_") and name != "p_error"]
+
+# go through each function, and build up our BNF dictionary
+# by examining the docstrings.
+for function in functions:
+    #print "name: "+function
+    docstring = getattr(parsermod, function).__doc__
+    #print "docstring: "+docstring
+    if docstring:
+        #print docstring
+        lines = docstring.splitlines()
+        lhs, firstrhs = lines.pop(0).split(":")
+        lines.insert(0, firstrhs)
+        lines = [line.strip().strip("|").strip() for line in lines if line.strip()]
+
+        lhs = "<"+lhs.strip()+">"
+
+        rhs = []
+        
+        for line in lines:
+            newline = []
+            for word in line.split():
+                word = word.strip()
+                if word in tokens:
+                    newline.append(word)
+                else:
+                    word = "<"+word+">"
+                    newline.append(word)
+                    pass
+                if word not in rhstracker:
+                    # keep track of items used on RHS of BNF
+                    rhstracker.append(word)
+                    pass
+                pass
+            rhs.append(newline)
+            pass
+        
+        if lhs in bnf:
+            bnf[lhs].extend(rhs)
+        else:
+            bnf[lhs] = rhs
+        pass
+    else:
+        print "FATAL: no BNF defined for function "+function
+        sys.exit(1)
+    pass
+
+
+# a helper function to print a BNF line to the screen
+def printline(wordlist):
+    for word in wordlist:
+        write(word + " ")
+        pass
+    write("\b\n")
+    pass
+
+# we would like to present the BNF in alphabetical order
+lhslist = bnf.keys()
+#lhslist.sort()
+
+# now that we have built up the BNF, print it stdout
+for lhs in lhslist:
+    rhslist = bnf[lhs]
+    rhsoffset = len(lhs) + 1
+    write(lhs+" ::= ")
+    if rhslist:
+        printline(rhslist[0])
+        for index in range(1, len(rhslist)):
+            write(" "*rhsoffset + "  | ")
+            printline(rhslist[index])
+            pass
+        write("\n")
+        pass
+    else:
+        write("\n\n")
+        pass
+    pass
+
+# do some checking to make sure our grammar is correct.
+# this is very rudimentary, actually using PLY will reveal much more.
+for item in rhstracker:
+    if item not in bnf.keys() and item not in tokens:
+        write("ERROR: "+item+" used but never defined.\n")
+        pass
+    pass
+for key in bnf.keys():
+    if key not in rhstracker:
+        write("Warning: "+key+" defined but never used.\n")
+        pass
+    pass
+for key in tokens:
+    if key not in rhstracker:
+        write("Warning: "+key+" defined but never used.\n")
+        pass
+    pass
+
+    

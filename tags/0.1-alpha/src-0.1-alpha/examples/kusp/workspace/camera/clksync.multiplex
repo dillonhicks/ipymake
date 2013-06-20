@@ -1,0 +1,18 @@
+
+<clksync>
+hostnames = [$(HOSTS)]
+logfile = "clksyncrun.log"
+commands = [
+	"rm /tmp/clksync.dsui.bin"
+	"synchronize $(TIMESERVER)"
+]
+outfiles = {
+	remotepath = "/tmp/clksync.dsui.bin"
+	localpath = "rawdata/clksync.dsui.bin"
+	addhost = true
+}
+
+<clksync_stop>
+hostnames = [$(HOSTS)]
+commands = ["killall -s INT synchronize"]
+

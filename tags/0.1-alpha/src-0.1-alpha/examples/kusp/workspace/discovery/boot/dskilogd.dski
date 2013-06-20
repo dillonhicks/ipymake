@@ -1,0 +1,25 @@
+<dski>
+output_base = "/tmp/dskid.dski.bin"
+
+<channels>
+chan1 = {
+	buffer_size = 500000,
+	buffer_count = 50
+}
+
+<datastreams>
+dski_filtered = {
+	channel = chan1
+	filters = [
+		task( 
+			ccsm_name = "system"
+		)
+	]
+	enabled = {
+		SYSTEM_COMP = [
+			    KTHREADD,
+			    SOFTIRQ_THREAD,
+			    WORKER_THREAD
+		]
+	}
+}

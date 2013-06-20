@@ -1,0 +1,21 @@
+<dski>
+output_base = "sigpipe1.dski.bin"
+child = "./sigpipe --dsui-config sigpipe.dsui --threads=5 --stimuli=1000"
+
+<channels>
+chan = {
+	buffer_size = 500000,
+	buffer_count = 50
+}
+
+<datastreams>
+dski = {
+	channel = chan
+	filters = []
+	enabled = {
+		SCHEDULER = [
+		    SWITCH_TO,
+		    SWITCH_FROM
+		]
+	}
+}

@@ -1,0 +1,64 @@
+<aggregate>
+filters = {
+	g1 = [
+		head.input(
+			file = [
+				"data/agg*.pick"
+				"data/kernel_agg*.pick"
+			]			
+		)
+		graph.aggregate(
+			"event" = "AGGREGATE/KERNEL_AVG"
+			"xaxis_label" = "NISTNet Delay (ms)"
+			"yaxis_label" = "Time (ms)"
+			"title" = "Kernel-level delay"
+			"xticks" = 10
+			"divisor" = 1000000
+		)
+
+		graph.aggregate(
+			"event" = "AGGREGATE/FRAME1_AVG"
+			"xaxis_label" = "NISTNet Delay (ms)"
+			"yaxis_label" = "Time (ms)"
+			"xticks" = 10
+			"divisor" = 1000000
+		)
+		graph.aggregate(
+			"event" = "AGGREGATE/FRAME2_AVG"
+			"xaxis_label" = "NISTNet Delay (ms)"
+			"yaxis_label" = "Time (ms)"
+			"xticks" = 10
+			"divisor" = 1000000
+		)
+		graph.aggregate(
+			"event" = "AGGREGATE/FRAME3_AVG"
+			"xaxis_label" = "NISTNet Delay (ms)"
+			"yaxis_label" = "Time (ms)"
+			"xticks" = 10
+			"divisor" = 1000000
+		)
+		graph.aggregate(
+			"event" = "AGGREGATE/FRAME4_AVG"
+			"xaxis_label" = "NISTNet Delay (ms)"
+			"yaxis_label" = "Time (ms)"
+			"xticks" = 10
+			"divisor" = 1000000
+		)
+		graph.aggregate(
+			"event" = "AGGREGATE/COMPLETE_AVG"
+			"xaxis_label" = "NISTNet Delay (ms)"
+			"yaxis_label" = "Time (ms)"
+			"xticks" = 10
+			"divisor" = 1000000
+		)
+		graph.aggregate(
+			"event" = "AGGREGATE/PROCESS_AVG"
+			"xaxis_label" = "NISTNet Delay (ms)"
+			"yaxis_label" = "Time (ms)"
+			"xticks" = 10
+			"divisor" = 1000000
+		)
+
+	]
+}
+

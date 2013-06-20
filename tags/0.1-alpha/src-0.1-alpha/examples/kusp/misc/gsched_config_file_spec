@@ -1,0 +1,88 @@
+# KUSP Group Scheduling Hierarchy Configuration File Documentation
+#
+# Dillon Hicks
+# August 2009
+#
+#
+# The top heading of the group scheduling hierarchy confgig file
+# (.gsh) must start with a section heading similar to the following
+# <gsh-installation> section.
+#
+
+<gsh-installation>
+local-root = "name-of-root-group"
+attachment-point = "name-of-associated-executable"
+
+#
+#  The *local-root* is the name of the root group of the Group
+#  Scheduling Hierarchy (GSH). This is analogous to a 'main' function
+#  in the C progrogramming lanugage. This is where the GSH starts and
+#  the main basis off of which all scheduling decisions are made by the
+#  kernel for the application that follows a .gsh configuration file.
+#
+#  If the main group in your hierarchy is foo then you would specify:
+#  
+#  *local-root = "foo"*
+#
+#
+#  The *attachment-point* is the string name of the
+#  application/executable that you wish to be under Group Scheduling
+#  control. If your program's name is fred, then you would specify:
+#  
+#  *attachment-point = "fred"* 
+#
+
+
+## 
+## #
+## # comment
+## #
+## <sdf-specification>
+## sdf_seq = {
+## 	name = "Sequential"
+## 	per_group_data = {}
+## 	per_member_data = {
+##         priority = {
+##                    type = "Integer"
+##                    value = 0
+##                    doc  = "Progress of the member."
+##                    index = 0   
+##                    attributes = []
+##        }
+## 	}
+## }
+
+## 
+## #
+## # comment
+## #
+## <groups>
+## main = {
+## 	sdf = "sdf_seq"
+## 	attributes = []
+## 	per_group_data = {}
+## 	members = [thread-0, thread-1, thread-2, thread-3]
+## 	ccsm_name = "main"
+## }
+## 
+
+## 
+## <threads>
+## thread-0 = 'simple-thread'
+## thread-1 = 'simple-thread'
+## thread-2 = 'simple-thread'
+## thread-3 = 'simple-thread'
+
+## 
+## <members>
+## simple-thread = {
+## 	attributes = [exclusive]
+## 	per_member_data = {
+## 		priority = 1
+## 	}
+## 	comment = "should create a member with priority 1"
+## 	ccsm_name = "simple-thread"
+## }
+## 
+## 
+##

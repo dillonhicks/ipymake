@@ -1,0 +1,67 @@
+<root>
+types = "dictionary"
+doc = "DSUI enable file"
+dictdef = {
+	"dsui" = @dsui
+	"dsui_enabled" = @dsui_enabled
+}
+
+<dsui>
+types = "dictionary"
+doc = "DSUI Library parameters"
+dictdef = {
+	"output_file" = {
+		"doc" = "Binary output filename"
+		"types" = "string"
+		"required" = false
+		"var" = 0
+	}
+	"enabled" = {
+		"doc" = "Turn DSUI on or off"
+		"types" = "boolean"
+		"default" = true
+		"var" = 1
+	}
+	"buffers" = {
+		"doc" = "buffers per datastream"
+		"types" = "integer"
+		"var" = 2
+		"default" = 16
+	}
+	"network_port" = {
+		"doc" = "remote port to connect to"
+		"types" = "integer"
+		"default" = -1
+		"var" = 4
+	}
+}
+
+<dsui_enabled>
+types = "dictionary"
+doc = "Enabled Families"
+var = 3
+opendictdef = {
+	types = ["boolean" "list"]
+	listdef = {
+		types = ["string" "invocation"]
+		openinvodef = {
+			"lowerbound" = {
+				types = ["long"]
+				default = 0
+			}
+			"upperbound" = {
+				types = ["long"]
+				default = 0
+			}
+			"buckets" = {
+				types = ["integer"]
+				default = 10
+			}
+			"tune_amount" = {
+				types = ["integer"]
+				default = 10
+			}
+		}
+	}
+}
+

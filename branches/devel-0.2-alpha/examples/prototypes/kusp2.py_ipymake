@@ -1,0 +1,327 @@
+
+#################################################################################
+#
+# =====================================
+# IPyMake Generated Python Script  
+# =====================================
+#
+# Created IPyMake Version: 0.2-alpha
+# Timestamp: Sun Dec 13 20:00:33 2009
+#
+# This Python script was created with IPyMake. To run this script you
+# will need to have IPython installed. To install IPython you can use
+# your distributions package manager, or the Python easy_install that is
+# included in the Python SetupTools "easy_install python".
+#
+#################################################################################
+
+# Standard/Useful imports
+import sys
+import os
+
+# Get the IPython API, we need their magic 
+# to get everything to run.
+import IPython.ipapi as ipapi
+ip = ipapi.get()
+
+# There isn't a ipython instance running,
+# get a dummy api instance.
+if ip is None:
+    ip = ipapi.get(allow_dummy=True, dummy_warn=False)
+
+from ipymake.runtimecore import *
+
+
+import sys
+import os
+global KUSPROOT 
+KUSPROOT = '.'
+global LOG_PATH 
+LOG_PATH = '~/tmp'
+global KUSPINSTALL 
+KUSPINSTALL = '/tmp/kuspinstall'
+global KUSPKERNELROOT 
+KUSPKERNELROOT = '.'
+
+@depends_on()
+@managed_target
+def initialize(**kwargs):
+    ip.runlines("""print 'initializing works'""")
+    pass
+
+
+
+
+@depends_on()
+@managed_target
+def cleanup(**kwargs):
+    ip.runlines("""print 'cleanup works'""")
+    pass
+
+
+
+
+@depends_on()
+@managed_target
+def wonderland(**kwargs):
+    ip.runlines("""build_subdir('wonderland','alice.py','hello')""")
+    pass
+
+
+
+
+@depends_on()
+@managed_target
+def kusp_configure(**kwargs):
+    ip.runlines("""print '--> Configuring Kusp'""")
+    ip.runlines("""if not os.path.exists('./build'):""")
+    ip.runlines("""    mkdir build""")
+    ip.runlines("""cd $KUSPROOT'/build'""")
+    ip.runlines("""cmake .. -DCMAKE_INSTALL_PREFIX=$KUSPINSTALL -DKERNELROOT=$KUSPKERNELROOT >& cmake.out""")
+    pass
+
+
+
+
+@depends_on()
+@managed_target
+def kusp_build(**kwargs):
+    ip.runlines("""print '--> Building Kusp'""")
+    ip.runlines("""cd $KUSPROOT'/build'""")
+    ip.runlines("""make VERBOSE=1 """)
+    pass
+
+
+
+
+@depends_on()
+@managed_target
+def random_loop(**kwargs):
+    ip.runlines("""for x in range(23424):""")
+    ip.runlines("""    print x""")
+    ip.runlines("""def generate_lolz():""")
+    ip.runlines("""    for x in range(2):""")
+    ip.runlines("""        for y in range(2):""")
+    ip.runlines("""            for z in range(2):""")
+    ip.runlines("""                for w in range(2):""")
+    ip.runlines("""                    yield 'lol'""")
+    ip.runlines("""for lol in generate_lolz():""")
+    ip.runlines("""    print lol""")
+    pass
+
+
+
+
+@depends_on()
+@managed_target
+def libkusp(**kwargs):
+    ip.runlines("""ldir = os.getcwd()+'/libkusp/'""")
+    ip.runlines("""libkusp_files = ['configfile.c',""")
+    ip.runlines("""                 'linkedlist.c',""")
+    ip.runlines("""                 'hashtable.c',""")
+    ip.runlines("""                 'hashtable_types.c',""")
+    ip.runlines("""                 'misc.c',""")
+    ip.runlines("""                 'kusp_common.c',""")
+    ip.runlines("""                 'rdwr.c',""")
+    ip.runlines("""                 'vector.c',""")
+    ip.runlines("""                 'exception.c',""")
+    ip.runlines("""                 'configverify.c',""")
+    ip.runlines("""                 'net.c',""")
+    ip.runlines("""                 'kusp_private.h'""")
+    ip.runlines("""                 ]""")
+    ip.runlines("""libkusp_files = map(lambda s: ldir+s, libkusp_files)""")
+    ip.runlines("""libkusp_files = filter(lambda s: s.endswith('.c'), libkusp_files)""")
+    ip.runlines("""compile_shared_library('kusp', include_dirs=['libkusp'], *libkusp_files)""")
+    ip.runlines("""compile_static_library('kusp', include_dirs=['libkusp'], *libkusp_files)""")
+    pass
+
+
+
+
+@depends_on(libkusp)
+@managed_target
+def test_install(**kwargs):
+    ip.runlines("""IPYM_INSTALL_PREFIX = 'helloworld'""")
+    ip.runlines("""print IPYM_INSTALL_PREFIX""")
+    ip.runlines("""print IPYM_BINARY_INSTALL_PREFIX""")
+    ip.runlines("""for b in IPYM_COMPILED_BINARIES:""")
+    ip.runlines("""    print b""")
+    pass
+
+
+
+
+@depends_on(wonderland,libkusp)
+@managed_target
+def hello(**kwargs):
+    ip.runlines("""compile_executable('helloworld', 'libkusp/hello.cpp',potatoes='yes, please', ant_farm="maybe", rutabagas='25kg')""")
+    ip.runlines("""#for bin in  IPYM_COMPILED_BINARIES:""")
+    ip.runlines("""#    print bin""")
+    ip.runlines("""#for fi in  IPYM_INSTALL_FILES:""")
+    ip.runlines("""#    print fi""")
+    pass
+
+
+
+
+@depends_on()
+@managed_target
+def world(**kwargs):
+    ip.runlines("""print 'WORLD!'""")
+    pass
+
+
+
+
+@depends_on(hello,world)
+@managed_target
+def helloworld(**kwargs):
+
+    pass
+
+
+
+
+@depends_on(helloworld)
+@managed_target
+def kusp_install(**kwargs):
+    ip.runlines("""print '--> Installing Kusp'""")
+    ip.runlines("""cd $KUSPROOT'/build'""")
+    ip.runlines("""make install VERBOSE=1 """)
+    pass
+
+
+
+
+@depends_on()
+@managed_target
+def check_examples_build_dir(**kwargs):
+    ip.runlines("""print """)
+    ip.runlines("""print '--> Checking for previous build directory'""")
+    ip.runlines("""if os.path.exists(KUSPROOT+'/examples/build'):""")
+    ip.runlines("""    print '----> Examples build directory exists'""")
+    ip.runlines("""else:""")
+    ip.runlines("""    print '----> Creating new examples build directory'""")
+    ip.runlines("""    mkdir $KUSPROOT'/examples/build'""")
+    pass
+
+
+
+
+@depends_on(check_examples_build_dir)
+@managed_target
+def examples(**kwargs):
+    ip.runlines("""print '--> Configuring Examples'""")
+    ip.runlines("""cd $KUSPROOT'/examples/build'""")
+    ip.runlines("""cmake .. -DCMAKE_INSTALL_PREFIX=$KUSPINSTALL >& $LOG_PATH'/kusp_install.out'""")
+    ip.runlines("""print '--> Configuration Successful'""")
+    ip.runlines("""print '--> Building Examples'""")
+    ip.runlines("""make VERBOSE=1 >& $LOG_PATH'/kuspmk_build_examples.out'""")
+    ip.runlines("""print'--> Built Examples'""")
+    pass
+
+
+
+
+@depends_on()
+@managed_target
+def clean_examples(**kwargs):
+    ip.runlines("""cd $KUSPROOT'/examples'""")
+    ip.runlines("""rm -rfv build""")
+    pass
+
+
+
+
+@depends_on()
+@managed_target
+def clean(**kwargs):
+    ip.runlines("""cd $KUSPROOT""")
+    ip.runlines("""rm -rfv build""")
+    pass
+
+
+
+
+@depends_on()
+@managed_target
+def tarball(**kwargs):
+    ip.runlines("""print '--> Removing the build directory'""")
+    ip.runlines("""rm -rfv $KUSPROOT'/build'""")
+    ip.runlines("""print '--> Creating the source tarball'""")
+    ip.runlines("""cd ..""")
+    ip.runlines("""tar -czv kussp > kusp.tar.gz""")
+    ip.runlines("""print '--> Moving tarball to rpmbuild directory'""")
+    pass
+
+
+
+
+@depends_on(tarball)
+@managed_target
+def rpm(**kwargs):
+    ip.runlines("""print '--> Executing rpmbuild'""")
+    ip.runlines("""rpmbuild -ba -vv $KUSPROOT'/rpms/kusp.spec' """)
+    ip.runlines("""print '--> RPM Created'""")
+    pass
+
+
+
+
+@depends_on(kusp_configure,kusp_build,kusp_install)
+@managed_target
+def all(**kwargs):
+
+    pass
+
+
+
+def init_hook(**kwargs):
+    if kwargs['recompile']:
+        ip.runlines("IPYM_COMMAND_ARGS = ' --force-recompile '")
+    else:
+        ip.runlines("IPYM_COMMAND_ARGS = '' ")
+
+    try:
+        __init__(**kwargs)
+    except(NameError):
+        pass
+    pass
+
+
+def install_hook():
+    try:
+        install()
+    except(NameError):
+        pass
+
+
+def cleanup_hook():
+    try:
+        cleanup()
+    except(NameError):
+        pass
+    pass
+
+
+if __name__ == "__main__":
+    COMMAND_STRING_TPL = """
+ipython -p sh -c "from %s import *; init_hook(); %s; cleanup_hook();"
+"""
+
+    filepath = sys.argv[0] # by definition
+    target = sys.argv[1]  # use optparse
+    filename = os.path.basename(filepath)
+    module_name = filename.split('.')[0]
+    cmd_str = COMMAND_STRING_TEMPLATE % (module_name, target)
+    sys.exit(os.system(cmd_str))
+    
+
+
+#################################################################################
+#                  END AUTOMATICALLY GENERATED FILE                             
+#
+# Note: It is best not to edit this file, unless you know what you are 
+# doing. Instead, change the input file and rerun ipymake or ipymakec.
+#
+#################################################################################

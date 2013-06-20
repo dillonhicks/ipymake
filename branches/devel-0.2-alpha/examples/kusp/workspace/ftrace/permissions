@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# Establish permissions to use ftrace...why is this necessary?
+
+sudo chmod 666 /debug/tracing/trace_options
+sudo chmod 666 /debug/tracing/current_tracer
+sudo chmod 666 /debug/tracing/tracing_max_latency
+sudo chmod 666 /debug/tracing/tracing_enabled
+sudo chmod 666 /debug/tracing/set_ftrace_filter
+sudo chmod 666 /debug/tracing/set_ftrace_notrace
+sudo chmod 666 /debug/tracing/set_ftrace_pid

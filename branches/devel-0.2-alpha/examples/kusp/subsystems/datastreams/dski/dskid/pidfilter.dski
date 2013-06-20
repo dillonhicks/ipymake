@@ -1,0 +1,11 @@
+@include /users/boie/boie.config
+
+<dski>
+kernel = "$(dski_kernel)"
+duration = 60
+output_file = "/tmp/context.dski.bin"
+verbose = true
+
+<dski_enabled>
+SCHEDULER_FAM = true
+

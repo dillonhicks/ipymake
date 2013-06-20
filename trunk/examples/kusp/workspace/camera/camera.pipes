@@ -1,0 +1,152 @@
+<camera>
+
+
+filters = {
+	main = [
+		head.input(
+			file =[
+				"rawdata/camserv.dsui.bin"
+				"rawdata/cthulhu.clksync.bin"
+				"rawdata/watcher.dsui.bin" 
+				"rawdata/t51.clksync.bin"
+			]
+			extra_data = "cameraedf.py"
+			convert_timestamps = true
+			namespace = { 
+
+				"INTERVALS" = {
+					entities = {
+						COMPLETE_LOOP = interval(
+							desc = "Read frame from camera --> Movement finished"
+						)
+						FRAME = interval(
+							desc = "user-to-user frame xmission time"
+						)
+					}
+				}	
+				"HISTOGRAMS" = {
+					entities = {
+						COMPLETE_LOOP = histogram(
+							desc = "Read frame from camera --> Movement finished"
+							units = "ms"
+						)
+						FRAME = histogram(
+							desc = "user-to-user frame xmission time"
+							units = "ms"
+						)
+						PROCESS = histogram(
+							desc = "per-frame processing time"
+							units = "ms"
+						)
+					}
+				}
+
+			}
+		)
+
+		conversion.interval_to_histogram(
+			interval = "TRACK_THREAD/PROCESS"
+			histogram = "HISTOGRAMS/PROCESS"
+			buckets = 100
+		)
+		conversion.event_to_interval(
+			start_event = "NETWORK_SERVER/SENT_FRAME"
+			end_event = "NETWORK_CLIENT/RECVD_FRAME"
+			interval = "INTERVALS/FRAME"
+		)
+
+
+	]
+
+	process = [
+		head.input(conn = main(index = -2, output = "histograms"))
+		graph.histogram(
+			histogram = "HISTOGRAMS/PROCESS"
+			divisor = 1000000
+			filename = "graphs/process"
+		)
+	]
+
+	frame1 = [
+		head.input(conn = main(index = -1, output = "intervals"))
+		conversion.interval_to_histogram(
+			interval = "INTERVALS/FRAME"
+			histogram = "HISTOGRAMS/FRAME"
+			buckets = 100
+			lowerbound = 15000000
+			upperbound = 25000000
+		)
+		graph.histogram(
+			histogram = "HISTOGRAMS/FRAME"
+			divisor = 1000000
+			title = "User-to-user frame transmission interval"
+			filename = "graphs/frame"
+		)
+	]
+
+	frame2 = [
+		head.input(conn = main(index = -1, output = "intervals"))
+		conversion.interval_to_histogram(
+			interval = "INTERVALS/FRAME"
+			histogram = "HISTOGRAMS/FRAME"
+			buckets = 100
+		)
+		graph.histogram(
+			histogram = "HISTOGRAMS/FRAME"
+			divisor = 1000000
+
+			title = "User-to-user frame transmission interval"
+			filename = "graphs/frame2"
+			yaxis_log = true
+		)
+	]
+
+	complete = [
+		head.input(conn = main)
+		camerafilters.frame_kill()
+		utility.narrate(
+			divisor = 1000000
+			output = "data/all.txt"
+		)
+
+		conversion.event_to_interval(
+			start_event = "CAPTURE/READ_FRAME"
+			end_event = "PTZ_CLIENT/DO_RECV_DONE"
+			consume = true
+			interval = "INTERVALS/COMPLETE_LOOP"
+		)
+	]
+
+	complete2 = [
+		head.input(conn = complete(output = "intervals"))
+		utility.narrate(
+			divisor = 1000000
+			output = "data/intervals.txt"
+		)
+		conversion.interval_to_histogram(
+			interval = "INTERVALS/COMPLETE_LOOP"
+			histogram = "HISTOGRAMS/COMPLETE_LOOP"
+			buckets = 100
+			lowerbound = 532800000
+			upperbound = 541000000
+		)
+		graph.histogram(
+			histogram = "HISTOGRAMS/COMPLETE_LOOP"
+			divisor = 1000000
+			title = "End-to-end Control Loop"
+			filename = "graphs/complete"
+		)
+	]
+}
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,29 @@
+
+
+IPymake Roadmap
+======================
+
+Contents:
+
+.. toctree:
+   :maxdepth: 2
+
+   
+0.1 Final Release Todo
+************************
+
+**High Priority**
+
+* Automated installation system for binary files created by ipymake as
+  well as a some sort of installation hook to specify additional
+  header and data files to be installed as well.
+
+* Create a viable way to recursively pass the command line arguments
+  to ipymakefiles in deeper directories.
+
+  * Fix the "--force-recompile" option.
+
+ 
+
+
+

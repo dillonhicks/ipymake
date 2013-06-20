@@ -1,0 +1,24 @@
+#!/bin/bash
+
+name=${PWD##*/}
+
+function fexec {
+	dskictrl -c ${name}.dski
+}
+
+function fpostprocess {
+	postprocess f ${name}.pipes
+}
+
+if [ $# -gt 0 ] ; then
+    if [ "$1" == "exec" ] ; then
+	fexec
+    elif [ "$1" == "postprocess" ] ; then
+	fpostprocess
+    else
+ 	echo "Invalid Option. Valid options are 'exec' or 'postprocess'."
+    fi
+else
+    fexec
+    fpostprocess
+fi

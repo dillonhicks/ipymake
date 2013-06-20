@@ -1,0 +1,49 @@
+<root>
+types = "dictionary"
+doc = "NETSPEC config file"
+opendictdef = {
+	"scoreboard" = {
+		types = "list"
+		listdef = {
+			types = "string"
+		}
+	}
+	"daemons" = {
+		types = "dictionary"
+		opendictdef = {
+			"command" = {
+				types = "string"
+				required = true
+			}
+			"host" = {
+				types = "string"
+				required = true
+			}
+			"port" = {
+				types = "integer"
+				default = 14100
+			}
+			"workingdir" = {
+				types = "string"
+				default = "."
+			}
+			"phases" = {
+				types = "dictionary"
+				opendictdef = {
+					"params" = {
+						types = "dictionary"
+						default = {}
+					}
+					"timeout" = {
+						types = "integer"
+						default = 60
+					}
+					"files" = {
+						types = "dictionary"
+						default = {}
+					}
+				}
+			}
+		}
+	}
+}

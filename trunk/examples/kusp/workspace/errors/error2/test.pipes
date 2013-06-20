@@ -1,0 +1,39 @@
+<main>
+filters = {
+	dski = [
+		head.input(
+			file = ["test.dski.bin/chan1/cpu*.bin"]
+		)
+
+
+	]
+
+	dsui = [
+		head.input(
+			file = ["test.dsui.bin"]
+		)
+
+	]
+
+        combined = [
+                head.input(
+                        conn = [dski, dsui]
+                )
+
+		utility.timestamp()
+
+		sort.sort_time()
+
+		utility.narrate(
+			output = "events.txt"
+			show_admin = false
+		)
+
+        ]
+
+}
+
+
+
+
+

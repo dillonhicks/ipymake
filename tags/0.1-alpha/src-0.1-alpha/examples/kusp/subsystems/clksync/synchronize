@@ -1,0 +1,192 @@
+#!/usr/bin/python
+
+from clksync import *
+from netspec import daemon
+from datastreams import dsui
+
+import getopt
+import sys
+import threading
+import time
+import signal
+
+sync_cv = threading.Condition()
+
+class SyncThread(threading.Thread):
+
+	def __init__(self, timeserver):
+		print "Sync thread created"
+		threading.Thread.__init__(self)
+		self.timeserver = timeserver
+		self.tell_sync = True
+		self.thread_loop = True
+	
+	def run(self):
+		print "Sync thread started"
+		drift = 0.0
+		timeserver = self.timeserver
+		# keep track of number of offsets collected since
+		# last time tsckhz was set
+		calib_ticks = 0
+
+		dsui.start(dsui_output, 0)
+
+		clkdev = clksync_device()
+	
+		nfo = query_time_server(timeserver)
+		start_tsc = nfo["tsc"]
+		last_tsc = nfo["tsc"]
+		analyzer = clksync_analyzer(10)
+
+		# XXX: no way to know if initial offset is good, but
+		# i don't think it matters too much
+		print "initial adjustment", nfo["offset"] * 10**6
+		clkdev.adjust_time(nfo["offset"])
+		dsui.event("CLKSYNC","ADJUSTRAW",0,nfo["offset"])
+		dsui.event("CLKSYNC","ADJUST",0,nfo["offset"]);
+
+		time.sleep(analyzer.get_sleep_time())
+	
+		while self.thread_loop:
+			calib_ticks = calib_ticks + 1
+	
+			nfo = query_time_server(timeserver)
+		
+			offset = nfo["offset"]
+			raw_offset = offset
+
+			# tscs since we last changed clock frequency
+			drift_tsc = nfo["tsc"] - start_tsc
+
+			# tscs since the last ntpdate poll
+			elapsed_tsc = nfo["tsc"] - last_tsc
+
+			print "raw offset (us):",offset * 10**6,
+
+			# is this a good offset? if not, retry
+			offset = analyzer.check_offset(offset, nfo["tsc"], elapsed_tsc, self.tell_sync)
+			
+			print "  smoothed offset (us):",offset * 10**6
+
+			if self.tell_sync and abs(offset * 10**6) < 10:
+				dsui.event("CLKSYNC", "IN_SYNC")
+				print "We seem to be in sync."
+				sync_cv.acquire()
+				self.tell_sync = False
+				sync_cv.notify()
+				sync_cv.release()
+
+
+			drift = drift + offset
+			correction = clkdev.get_tsckhz_correction(drift, drift_tsc)
+
+			if correction != 0 and calib_ticks > 10:
+				# once we are in sync, don't correct by more than 1
+				if correction > 1 and not self.tell_sync:
+					correction = 1
+				if correction < -1 and not self.tell_sync:
+					correction = -1
+
+				freq = clkdev.get_frequency()
+				print "Adjusting clock frequency from ",freq,
+				print "to ",(freq + correction)
+				new_tsckhz = freq + correction
+
+				clkdev.set_frequency(new_tsckhz)
+				dsui.event("CLKSYNC", "SET_FREQ", new_tsckhz)
+				start_tsc = nfo["tsc"]
+				drift = 0.0
+				calib_ticks = 0	
+				analyzer.reset_data()
+			
+			clkdev.adjust_time(offset)
+			dsui.write_time()
+			dsui.event("CLKSYNC","ADJUSTRAW",int(abs(raw_offset * 1000000000)),raw_offset)
+			dsui.event("CLKSYNC","ADJUST",int(abs(offset * 1000000000)),offset);
+
+			# insert code here to dynamically scale
+			# the sleep interval
+			last_tsc = nfo["tsc"]
+			time.sleep(analyzer.get_sleep_time())
+
+		# Loop ended, clean up
+		print "CLOSING DSUI"
+		dsui.close()
+		print "CLOSE COMPLETE"
+
+# Global thread
+st = SyncThread("foo")
+
+def cleanup_phase(cfg=None, signum=None):
+	st.thread_loop = False
+	if netspec_fd:
+		while st.isAlive():
+			pass
+		daemon.ns_acknowledge(daemon.NS_OK_EXIT, filename="/tmp/clksync.dsui.bin")
+	else:
+		sys.exit()
+
+
+
+def sync_phase(cfg):
+	st.timeserver = cfg["timeserver"]
+	st.start()
+
+	sync_cv.acquire()
+	while st.tell_sync:
+		sync_cv.wait()
+	sync_cv.release()
+	print "sync phase done"
+
+
+print 'Processing command line'
+try:
+	opts, files = getopt.getopt(sys.argv[1:],
+			"s:hn:o:",
+			["help", "server", "netspec="])
+except getopt.GetoptError:
+	usage()
+	sys.exit(2)
+
+server = None
+netspec_fd = None
+dsui_output = "/tmp/clksync.dsui.bin"
+
+for o, a in opts:
+	if o in ['-h', '--help']:
+		usage()
+		sys.exit()
+	if o in ['-s', '--server']:
+		server = a
+	if o in ['-n', '--netspec']:
+		netspec_fd = int(a)
+	if o in ['-o', '--output']:
+		output = a
+
+
+if netspec_fd:
+	print "USING NETSPEC"
+elif not server:
+	print "No time server specified."
+	sys.exit(3)
+
+
+
+signal.signal(signal.SIGINT, cleanup_phase)
+
+
+if netspec_fd:
+	daemon.ns_set_execute("sync", None, sync_phase)
+	daemon.ns_set_execute("cleanup", None, cleanup_phase)
+	daemon.ns_begin(netspec_fd)
+
+
+try:
+	st.timeserver = server
+	st.start()
+	while (True):
+		time.sleep(1)
+	sys.exit()
+except KeyboardInterrupt:
+	print "User interrupted."
+

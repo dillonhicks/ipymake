@@ -1,0 +1,441 @@
+#!/usr/bin/env /usr/bin/python
+
+# DSKI daemon
+#
+# author: andrew boie
+
+from threading import Thread, enumerate, Condition
+from select import poll, POLLIN
+import time
+import sys
+import os
+import mmap
+import getopt
+#from pykusp import configfile
+import pykusp.configutility as configfile
+#from gsched_mod import *
+from datastreams import namespaces
+from datastreams.dski import *
+import struct
+import signal
+import clksync_mod
+import optparse
+import socket
+import pprint
+import pyccsm.ccsmapi as ccsm
+
+# This code was andrew boie's hook for using the
+# datastream controller as a remotely controlled 
+# netspec daemon 
+try:
+	from netspec import daemon
+except Exception:
+	daemon = None
+	pass
+
+# FIXME - This is a hardcoded output file for use with Discovery experiments.
+# Should ask Bala if is subsumed by the latest traceme code, if not, we need
+# to make it unncessary.
+dsui_output="/tmp/dscvr.dsui.bin"
+
+# This is the human readable declaration of your dski daemon configuration file
+# specification. configfile.parse_string reduces it to a correctly formatted inline
+# string for use with the configfile language parser.
+# 
+# FIXME - Note that the evil /tmp default is defined down in the guts of this spec
+# string and should be fixed
+dskid_cspec = """
+<task_filter>
+default_response = {
+	doc = "Default response if no matches were made"
+	types = "string"
+	constraints = [
+		"ACCEPT",
+		"REJECT",
+		"PASS",
+	]
+	default = "REJECT"
+}
+pid = {
+	doc = "A pid to filter on"
+	types = "integer"
+	default = -1
+}
+ccsm_name = {
+	doc = "A ccsm set name to filter on"
+	types = "string"
+}
+
+<dscvr>
+ta_name = {
+	types = "string"
+	doc = "Name of the task alias group to add discovered tasks to"
+	default = []
+}
+enabled = {
+	types = "list"
+	doc = "List of enabled discovery events"
+	default = []
+}
+
+
+<root>
+types = "dictionary"
+doc = "DSKI relay channel definitions"
+dictdef = {
+	dski = @dski,
+	channels = @channels,
+	datastreams = @datastreams
+}
+
+
+<dski>
+default = {}
+types = "dictionary"
+doc = "DSKI relay channel definitions"
+dictdef = {
+	child = {
+		types = "string"
+		doc = "child process to run during logging"
+	}
+	output_base = {
+		types = "string"
+		doc = "Base path for binary output"
+		default = "/tmp/dski"
+	}
+	duration = {
+		types = "integer"
+		doc = "period (in seconds) to log events, 0 logs forever"
+		default = 0
+	}
+	verbose = {
+		types = "boolean"
+		doc = "print debugging messages"
+		default = false
+	}
+}
+
+<channels>
+default = {}
+types = "dictionary"
+doc = "DSKI relay channel definitions"
+opendictdef = {
+	types = "dictionary"
+	doc = "DSKI Channel Parameters"
+	required = true
+	dictdef = { 
+		buffer_size = {
+			types = "integer"
+			doc = "Set size of kernel relay buffers"
+			default = 500000
+		}
+		buffer_count = {
+			types = "integer"
+			doc = "Number of kernel relay buffers"
+			default = 50
+		}
+		ringbuffer = {
+			types = "boolean"
+			doc = "If true, put datastream in ringbuffer mode"
+			default = false
+		}
+	}
+}
+
+<datastreams>
+types = "dictionary"
+default = {}
+doc = "DSKI daemon configuration file"
+opendictdef = {
+	types = "dictionary"
+	doc = "DSKI Parameters"
+	required = true
+	dictdef = {
+		channel = {
+			types = "string"
+			doc = "DSKI Channel to log data to"
+			default = "default"
+		}
+		filters = {
+			types = "list"
+			listdef = {
+				types = "invocation"
+				invodef = {
+					traceme = {}
+                                        printk = {}
+					task = @task_filter
+					discover = @dscvr
+				}
+			}
+			default = []
+			doc = "list of filters for this datastream"
+		}
+		child_alias = {
+			types = "string"
+			doc = "Task alias for child process"
+			default = ""
+		}
+		enabled = {
+			types = ["dictionary", "boolean"]
+			doc = "Enabled kernel categories"
+			required = true
+			opendictdef = {
+				types = ["list" "boolean"]
+				listdef = {
+					types = ["string" "invocation"]
+					openinvodef = {
+						buckets = {
+							types = "integer"
+							default = 20
+						}
+						lowerbound = {
+							types = "long"
+							default = 0L
+						}
+						upperbound = {
+							types = "long"
+							default = 0L
+						}
+						tune = {
+							types = "integer"
+							default = 100
+						}
+					}
+					doc = "Entity to enable"
+				}
+				doc = "List of enabled events within family"
+			}
+		}
+	}
+}
+""";
+
+# dskid_cspec = configfile.check_spec(dskid_cspec)
+
+
+def verb(msg):
+	if options.verbose:
+		print msg
+
+
+# 
+
+def process_config(cfg):
+	global child
+	global child_alias
+
+	# Different datastreams can have different aliases (or not have an alias).
+	# Store all of the aliases so that we can enable them later.
+	child_alias = []
+
+	c = dski_context(cfg["dski"]["output_base"])
+
+	if cfg["dski"].has_key("child"):
+		child = cfg["dski"]["child"].split()
+	else:
+		child = None
+
+	created_channels = []
+
+	if "channels" not in cfg:
+		cfg["channels"] = {}
+
+	cfg["channels"]["default"] = {
+		"buffer_size" : 500000,
+		"buffer_count" : 50,
+		"ringbuffer" : False
+	}
+
+	for ds_name, v in cfg["datastreams"].items():
+		chan_name = v["channel"]
+		
+		# create channels only on demand; if a channel is defined
+		# but not used, we won't instantiate it
+
+		if chan_name not in created_channels:
+			cd = cfg["channels"][chan_name]
+			c.create_channel(chan_name, cd["buffer_size"], cd["buffer_count"],
+					 cfg["dski"].get("duration", 0),
+					 cd.get("ringbuffer", False));
+			created_channels.append(chan_name)
+
+		if "child_alias" in v:
+			child_alias.append(v["child_alias"])
+
+		dso = c.create_datastream(ds_name, v["channel"])
+		dso.process_enabled_dict(v["enabled"])
+		dso.process_filter_list(v["filters"])
+
+	return c
+
+
+
+ctx = None
+def sighandler(signum, frame):
+	print "Caught signal", signum
+	if ctx:
+		ctx.close()
+	sys.exit(0)
+
+
+def config_callback(option, opt, value, parser):
+	global ctx
+	print "Parsing configuration file", value
+	try:
+#		c = configfile.parse_config(value, dskid_cspec)
+		c = configfile.parse_config(value)
+		ctx = process_config(c)
+	except Exception, e:
+		print e
+		sys.exit(1)
+
+def show_config_help(option, opt, value, parser):
+	configfile.get_spec_help(sys.stdout, dskid_cspec)
+	sys.exit(0)
+
+
+def start_phase(params):
+	global ctx
+	
+	if ctx:
+		print "Only 1 config file may be used at a time"
+		sys.exit(1)
+
+	ctx = process_config(params)
+	ctx.start_logging()
+
+	daemon.ns_acknowledge(daemon.NS_OK)
+
+def cleanup_phase(params):
+	out_files = ctx.get_output_filenames()
+	ctx.close()
+	daemon.ns_acknowledge(daemon.NS_OK_EXIT, filename=out_files)
+
+
+if daemon:
+	daemon.ns_set_execute("start", None, start_phase);
+	daemon.ns_set_execute("cleanup", None, cleanup_phase);
+
+
+def netspec_callback(option, opt, value, parser):
+	daemon.ns_begin(value)
+
+
+parser = optparse.OptionParser()
+parser.add_option("-v", "--verbose", dest="verbose", action="store_true",
+		help="Print various debugging messages")
+parser.add_option("-N", "--namespace", dest="namespace", action="store_true",
+		help="Print kernel namespace and exit")
+parser.add_option("-c", "--config", action="callback", callback=config_callback,
+		type="string", help="Configuration file to use")
+parser.add_option("-H", "--config-help", action="callback", 
+		callback=show_config_help, help="Show help for config files")
+if daemon:
+	parser.add_option("-X", "--netspec", action="callback", 
+			callback=netspec_callback, type="int",
+			help="Use NETSPEC with given file descriptor")
+
+
+parser.set_defaults(
+	verbose = False,
+	namespace = False)
+
+(options, entities) = parser.parse_args()
+
+signal.signal(signal.SIGINT, sighandler)
+signal.signal(signal.SIGTERM, sighandler)
+
+etypemap = {
+	namespaces.INTERVALTYPE : "I",
+	namespaces.COUNTERTYPE  : "C",
+	namespaces.OBJECTTYPE   : "O",
+	namespaces.HISTOGRAMTYPE: "H",
+	namespaces.EVENTTYPE    : "E"
+}
+
+if options.namespace:
+	# FIXME - yet another mention of /tmp. Why so many?
+	c = dski_context("/tmp")
+	ns = c.get_namespace()
+	# FIXME - correct variable names to reflect use of term
+	# category vs. family
+	for fname, edict in ns.get_families().items():
+		print fname
+		for ename, espec in edict.items():
+			print "\t",etypemap[espec.get_type()],ename,espec.get_description()
+
+	c.close()
+	sys.exit(0)
+
+
+
+if not ctx:
+	print "No configuration file specified!"
+	sys.exit(1)
+
+ctx.start_logging()
+print "Now logging events"
+
+
+#gsched_dev = open("/dev/group_sched")
+
+if child:
+	print "Starting child process: ", child[0]
+
+	if child_alias:
+		ccsm_fd = ccsm.ccsm_open()
+
+	pid = os.fork()
+	if pid == 0:
+
+		for alias in child_alias:
+			# Create a component representing the child.
+			child_name = alias+'-'+`os.getpid()`
+
+			ccsm.ccsm_create_component_self(ccsm_fd, child_name)
+			
+			# Create the CCSM set that the child task will belong to.
+			ccsm.ccsm_create_set(ccsm_fd, alias, 0)
+
+			# Add the component to the set.
+			ccsm.ccsm_add_member(ccsm_fd, alias, child_name)
+		try:
+			os.execvp(child[0], child)
+		except OSError, e:
+			print e
+			sys.exit(e.errno)
+		finally:
+			sys.exit(1)
+	else:
+		try:
+			pid, ret = os.waitpid(pid, 0)
+
+			if child_alias:
+				
+				# Cleanup
+				for alias in child_alias:
+					child_name = alias+'-'+`pid`
+					ccsm.ccsm_remove_member(ccsm_fd, alias, child_name)
+					ccsm.ccsm_destroy_component_by_name(ccsm_fd, child_name)
+					ccsm.ccsm_destroy_set(ccsm_fd, alias)
+
+                                ccsm.ccsm_close(ccsm_fd)
+
+		except KeyboardInterrupt:
+			print "dskictrl got keyboard interrupt"
+else:
+	try:
+		if False:
+			print "Logging for",options.duration,"seconds."
+			time.sleep(options.duration);
+			print "Logging complete. Shuttng down."
+		else:
+			print "Press Ctrl-C to finish."
+			signal.pause()
+	except KeyboardInterrupt:
+		pass
+
+print "Closing up."
+
+ctx.close()
+

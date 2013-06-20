@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Optional: Turn on ftrace to see the functions being executed.
+if [ $# -gt 0 ]
+then 
+    sudo sysctl kernel.ftrace_enabled=$1
+else
+    sudo sysctl kernel.ftrace_enabled=1
+fi
+
+# Specify what tracer we want.
+echo preemptirqsoff > /debug/tracing/current_tracer
+
+# Reset the maximum latency to 0. Nothing will be recorded if a latency less than the max occurs.
+echo 0 > /debug/tracing/tracing_max_latency
+
+# Start tracing.
+echo 1 > /debug/tracing/tracing_enabled
+
+# Do something.
+ls -ltr
+
+# Stop tracing.
+echo 0 > /debug/tracing/tracing_enabled
+
+# View the trace.
+cat /debug/tracing/trace

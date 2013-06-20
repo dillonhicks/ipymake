@@ -1,0 +1,88 @@
+<root>
+doc = "Toplevel of spec file"
+types = ["dictionary"]
+opendictdef = {
+	doc = "We don't care about other blocks until they are referenced from root"
+	types = ["dictionary"]
+}
+dictdef = {
+	"root" = {
+		doc = "Definition of toplevel dictionary"
+		types = ["dictionary"]
+		required = true
+		dictdef = @item_dictdef
+	}
+}
+
+<item_block>
+doc = "Specification for an arbitrary item"
+types = ["dictionary"]
+dictdef = @item_dictdef
+
+<item_dictdef>
+"doc" = {
+	doc = "Documentation for a particular item"
+	types = ["string"]
+	default = "Undocumented item"
+}
+"var" = {
+	doc = "Index within array to assign item"
+	types = ["integer"]
+}
+"types" = {
+	doc = "List of allowed types for this item"
+	types = ["list"]
+	listdef = {
+		types = ["string"]
+		constraints = ["string" "any" "integer" "dictionary" 
+			"opendict" "list" "real" "invocation" 
+			"boolean" "list" "long"]
+	}
+	required = true
+}
+"strlen" = {
+	doc = "Impose a length limit on strings"
+	types = ["integer"]
+}
+"exclusive" = {
+	doc = "If in a dictionary, other keys which cannot be defined alongside this one"
+	types = ["list"]
+	listdef = {
+		types = ["string"]
+	}
+}
+"required" = {
+	doc = "Whether this item must be defined within a dictionary. Used in dictdefs"
+	types = ["boolean"]
+	default = false
+}
+"default" = {
+	doc = "Default value for this item"
+	types = ["any"]
+}
+"dictdef" = {
+	doc = "Closed-form definition of keys in this dictionary"
+	types = ["dictionary"]
+	opendictdef = @item_block
+}
+"opendictdef" = @item_block
+"openinvodef" = {
+	types = ["dictionary"]
+	opendictdef = @item_block
+}
+"invodef" = {
+	doc = "Dictionary mapping names to expected parameters"
+	types = ["dictionary"]
+	opendictdef = {
+		types = ["dictionary"]
+		opendictdef = @item_block
+	}
+}
+"listdef" = @item_block
+"constraints" = {
+	doc = "List of allowed values for this item"
+	types = ["list"]
+	listdef = {
+		types = ["any"]
+	}
+}

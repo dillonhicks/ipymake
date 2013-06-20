@@ -1,0 +1,45 @@
+<dski>
+output_base = "sigpipe2.dski.bin"
+child = "./sigpipe --dsui-config sigpipe.dsui --threads=5 --stimuli=2000"
+
+<channels>
+chan1 = { 
+    buffer_size = 500000,
+    buffer_count = 50
+}
+chan2 = { 
+    buffer_size = 500000,
+    buffer_count = 50
+}
+
+<datastreams>
+dski_nofilter = { 
+    channel = chan1
+    filters = []
+    enabled = { 
+        SCHEDULER = [ 
+            SWITCH_TO,
+            SWITCH_FROM
+        ]
+    }
+}
+
+dski_filtered = { 
+    channel = chan2
+    filters = [ 
+        task(
+            ccsm_name = "sigpipe"
+        )
+    ]
+    child_alias = "sigpipe"
+    enabled = { 
+        SCHEDULER = [ 
+            SWITCH_TO,
+            SWITCH_FROM
+        ],
+	    FORK = [
+                DO_FORK
+        ]
+    }
+}
+

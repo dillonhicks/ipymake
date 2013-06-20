@@ -1,0 +1,22 @@
+module PostprocessLink {
+	typedef sequence<string> StringList;
+	
+	interface QueueLink {
+		string get();
+	};
+
+	interface PipelineLink {
+		QueueLink connect(in string client_name, in string output_name, 
+				in string queue_params);
+	};
+
+	interface ProcessingNodeLink {
+		void set_local_modules(in StringList localmods);
+		void set_local_edf(in StringList localedf);
+		void create_pipeline(in string name, in string pipeline_def);
+		void run() raises 
+	};
+};
+
+	
+

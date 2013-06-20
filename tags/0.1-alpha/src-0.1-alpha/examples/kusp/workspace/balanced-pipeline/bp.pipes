@@ -1,0 +1,13 @@
+<main>
+filter_modules = "bp_filter.py"
+filters = {
+	f1 = [
+		head.input(
+			file = ["/tmp/pipeline.dsui.bin"]
+			extra_data = "bpedf.py"
+		)
+		utility.timestamp()
+#		utility.narrate()
+		bp_filter.graph()
+	]
+}

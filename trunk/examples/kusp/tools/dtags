@@ -1,0 +1,208 @@
+#!/bin/env python
+import optparse, sys, os
+import fnmatch
+import re
+import signal
+
+SOURCE_FILE_TYPES = {
+    'ada':        ['.ads', '.adb', '.ada'],
+    'asm':        ['.a', '.asm', '.def', '.inc', '.ins', '.s', '.sa', '.S', '.src'],
+    'c':          ['.c', '.h'],
+    'c++':        ['.C', '.c++', '.cc', '.cpp', '.cxx', '.H', '.h++', '.hh', '.hpp', '.hxx', '.M', '.pdb'],
+    'c*':         ['.cs', '.hs'],
+    'cmake' :     ['CMakeLists.txt'],
+    'cobol':      ['.COB', '.cob'],
+    'erlang':     ['.erl', '.hrl'],
+    'forth':      ['.fth', '.tok'],
+    'fortran':    ['.F', '.f', '.f90', '.for'],
+    'html':       ['.htm', '.html', '.shtml'],
+    'java':       ['.java'],
+    'lisp':       ['.cl', '.clisp', '.el', '.l', '.lisp', '.LSP', '.lsp', '.ml'],
+    'lua':        ['.lua', '.LUA'],
+    'makefile':  [ 'Makefile',' makefile',' GNUMakefile',' Makefile.in',' Makefile.am', '.mk'],
+    'objc':       ['.lm', '.m'],
+    'pascal':     ['.p', '.pas'],
+    'perl':       ['.pl', '.pm'],
+    'php':        ['.php', '.php3', '.php4'],
+    'postscript': ['.ps', '.psw'],
+    'proc':       ['.pc'],
+    'prolog':     ['.prolog'],
+    'python':     ['.py'],
+    'scheme':     ['.oak', '.sch', '.scheme', '.SCM', '.scm', '.SM', '.sm', '.ss', '.t'],
+    'tex':        ['.bib', '.clo', '.cls', '.ltx', '.sty', '.TeX', '.tex'],
+    'texinfo':    ['.texi', '.texinfo', '.txi'],
+    'yacc':       ['.y', '.y++', '.ym', '.yxx', '.yy'],
+
+}
+
+LOG_FILE = 'dtags.log'
+
+def etags(filepath):
+    os.system("echo [%s] >> %s" % (filepath, LOG_FILE)) 
+    os.system("etags -a %s >> %s" % (filepath, LOG_FILE)) 
+
+
+def gen_code_files(path):
+    if not os.path.exists(path):
+        print 'Error(2): %s no such file or directory.' % path
+        sys.exit(2)
+    if not os.path.isdir(path): 
+        (path,(line for line in open(path, 'r')))
+    for path, dir_list, file_list in os.walk(path):
+        for extension_list in SOURCE_FILE_TYPES.values():
+            for extension in extension_list:
+                if extension.startswith('.'):
+                    extension = "*%s" % extension
+                for name in fnmatch.filter(file_list, extension):
+		    filepath = os.path.join(path, name)
+                    yield filepath
+    
+
+
+def do_tagging(path):
+    tagsfile = "%s/TAGS" % path
+    logfile = "%s/dtags.log" % path
+    os.system("rm %s %s >& /dev/null" % (tagsfile, logfile))
+    source_files = gen_code_files(path)
+    for srcfile in source_files:
+    	etags(srcfile)
+
+def print_spin():
+    import time
+    spin_sprite = ["|", "\\", "-", "/"]
+    sys.stdout.write("Tagging.")
+    counter = 0
+    while(True):
+        sys.stdout.write("%s\x08" % spin_sprite[counter%4])
+        sys.stdout.flush()
+        counter += 1
+        if counter % 4 == 0:
+            sys.stdout.write('.')
+        time.sleep(.25)
+
+########################################################
+#
+# All of the test modules will need the same options front
+# end, so this can be imported where one would normally
+# place the optparse template. 
+#
+#
+
+if __name__ == '__main__':
+    # imports required if this module is called as a
+    # command
+    
+    # Define the set of permitted parameters, including the
+    # command arguments.  The initialization method creates
+    # the parser and defines the defaults. The parse()
+    # method actually parses the arguments one the command
+    # line. This was done so that the instance of the class
+    # could be global and thus available to all
+    # routines. and then parse the arguments to this call
+    # according to the specification
+    class Params_Set:
+        USAGE = "usage: %prog [options]"
+    
+        def __init__(self):
+            # Create the argument parser and then tell it
+            # about the set of legal arguments for this
+            # command. The parse() method of this class
+            # calls parse_args of the optparse module
+            self.p = optparse.OptionParser(usage=self.USAGE)
+    
+            # Boring and totally standard verbose and
+            # debugging options that should be common to
+            # virtually any command
+            #
+            self.p.add_option("-d", action="store_const", const=1,        
+                              dest="debug_level", 
+                              help="Turn on diagnostic output at level 1")
+            self.p.add_option("-D", action="store", type ="int",    
+                              dest="debug_level", 
+                              help="Turn on diagnostic output at level DEBUG_LEVEL")
+            self.p.add_option("-v", action="store_const", const=1,        
+                              dest="verbose_level", 
+                              help="Turn on narrative output at level 1")
+            self.p.add_option("-V", action="store", type ="int",    
+                              dest="verbose_level", 
+                              help="Turn on narrative output at level VERBOSE_LEVEL")
+            
+              
+
+			      
+			      
+
+
+            # Now tell the parser about the default values of all the options
+            # we just told it about
+            self.p.set_defaults(
+                debug_level     = 0,          
+                verbose_level   = 0,
+                path          = '.',
+		search_pattern = None
+                )       
+            
+        def parse(self):
+            self.options, self.args = self.p.parse_args()
+            self.debug_level     = self.options.debug_level    
+            self.verbose_level   = self.options.verbose_level  
+            self.path          = self.options.path
+            self.search_pattern = self.options.search_pattern
+            if len(self.args) > 0:
+                self.path  =  self.args.pop(0)
+            if len(self.args) > 0:
+                self.search_pattern = ' '.join(self.args)
+	    
+
+            if self.debug_level >= 3 :
+                print
+                print "Options: ", self.options
+                print "Args: ", self.args
+    
+        # Defining this method defines the string representation of the
+        # object when given as an argument to str() or the "print" command
+        #cd
+        def __str__(self):
+            param_print_str = \
+    """Parameters:
+      debug_level    : %d
+      verbose_level  : %d
+      path           : %s
+      search pattern : %s
+    """ 
+    
+            str_output = param_print_str % \
+                (self.debug_level, 
+                 self.verbose_level,
+                 self.path,
+		 self.search_pattern)  
+            
+            return str_output
+        
+    def main():
+        # Global level params class instance was
+        # created before calling main(). We make it
+        # global so that other code can access the set
+        # of Parameters, simply by accessing the Params
+        # instance. Here, however, we call the parse()
+        # method to actually get the arguments, since
+        # we have been called from the command line.
+        Params.parse()
+        debug_level = Params.debug_level
+        if Params.debug_level >= 2:
+            print Params
+        
+        pid = os.fork()
+        if pid == 0:
+            print_spin()
+        else:
+            do_tagging(Params.path)
+            os.kill(pid, signal.SIGKILL)
+            print
+            os.system("echo `cat dtags.log 2> /dev/null | wc -l` files tagged.")
+            print 'Done!'
+    
+    global Params
+    Params = Params_Set()
+    
+    main()

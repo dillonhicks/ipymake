@@ -1,0 +1,89 @@
+<netspec>
+interactive = true
+incoming_dir = "./test"
+scoreboard = [
+# slot 1
+	{
+		dski_cthulhu = "start"
+		camserv = "listen"
+#		clksync_cthulhu = "sync"
+	}
+	
+# slot 2
+	{
+		watcher = "connect"
+	}
+# slot 3
+	{
+		watcher = "cleanup"
+		dski_cthulhu = "cleanup"
+		camserv = "cleanup"
+#		clksync_cthulhu = "cleanup"
+	}
+]
+
+daemons = {
+	camserv = {
+		host = cthulhu
+		command = "camserv"
+		phases = {
+			listen = {
+				params = {
+					camera_type = vcc3
+					video_input = 1
+				}
+			}
+		}
+	}
+
+	clksync_cthulhu = {
+		host = cthulhu
+		command = "synchronize"
+		phases = {
+			sync = {
+				params = {
+					timeserver = "testbed60"
+				}
+			}
+		}
+	}
+
+	dski_cthulhu = {
+		host = cthulhu
+		command = "dskid"
+		phases = {
+			start = {
+				params = {
+					dski = {
+						duration = 0
+						output_file = "/tmp/dski.bin"
+						verbose = false
+					}
+					dski_enabled = {
+						NETWORK_DRIVER_FAM = [
+							EVENT_E100_RX,
+							EVENT_E100_TX
+						]
+					}
+				}
+			}
+		}
+	}
+	watcher = {
+		host = yggdrasil
+		command = "kuim_watcher"
+		phases = {
+			connect = {
+				params = {
+					video_host = cthulhu
+					enable_display = false
+					camera_host = cthulhu
+				}
+			}
+		}
+	}
+}
+
+	
+
+

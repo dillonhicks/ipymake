@@ -1,0 +1,23 @@
+<dski>
+output_base = "/tmp/safety_test.dski.bin"
+child = "./safety_test --dsui-output /tmp/safety_test.dsui.bin"
+
+<channels>
+chan1 = {
+	buffer_size = 500000,
+	buffer_count = 50
+}
+
+<datastreams>
+dski = {
+	channel = chan1
+	filters = []
+	enabled = {
+		SDF_SAFE = [
+			 LINUX_TIMEOUT,
+			 LINUX_TIMEOUT_SCHED,
+			 FORCE_LINUX,
+			 SAME_MEMBER
+		]
+	}
+}

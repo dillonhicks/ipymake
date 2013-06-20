@@ -1,0 +1,10 @@
+#! /bin/env python
+"""
+"""
+
+import pygsched.gsgraphviz as gsgraph
+import pygsched.gsprocutils as gsproc
+
+current_hierarchy = gsproc.parse()
+gsgraph.create_image_from_gsh(current_hierarchy,
+	outpath='./system_hierarchy_snapshot.png')

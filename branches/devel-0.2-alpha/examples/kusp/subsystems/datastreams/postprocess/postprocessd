@@ -1,0 +1,9 @@
+#!/usr/bin/env python
+
+from omniORB import CORBA, PortableServer, CosNaming
+
+from pipeline import *
+
+orb = CORBA.ORB_init(sys.argv, CORBA_ORB_ID)
+poa = orb.resolve_initial_references("RootPOA")
+

@@ -1,0 +1,4 @@
+include driver-mode
+include dmode.desktop
+include gpsdrive.desktop
+recursive-include dmode/sounds *.wav

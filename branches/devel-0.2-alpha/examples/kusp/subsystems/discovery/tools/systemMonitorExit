@@ -1,0 +1,123 @@
+#!/usr/bin/env python
+# System Monitor Exit Tool
+# authors: Bala Sridhar
+
+
+import sys
+import os
+import optparse
+import tempfile
+import subprocess as sp
+import signal
+import pickle
+from pykusp import taskalias
+from pykusp import configfile
+from datastreams import dski
+from datastreams import dsui
+from datastreams.postprocess import pipeline
+
+# Used for closing any existing systemMonitor tool running in the background.
+class systemMonitorExit():
+	
+	def __init__(self):
+		"""In this Function we create the config file language that is associated with this 
+		tool. 
+		"""
+		self.config_spec = configfile.parse_string("""
+		<root>
+		types = "dictionary"
+		doc = "System monitor related stuff"
+		dictdef = {
+		close_monitor = @close_monitor
+		}
+
+		<close_monitor>
+		types = "dictionary"
+		default = {}
+		doc = "closing contents"
+		opendictdef = {
+			types = "dictionary"
+			doc ="names to be closed"
+			required = true
+			dictdef = {
+				names = { 
+					types = "list"
+					listdef = {
+						types = "string"
+					}
+					doc ="List of monitor tools to be closed: the list is a list of session names"
+					default = []
+				}
+			}
+		}
+		""")
+		self.config_spec = configfile.check_spec(self.config_spec)
+		# Status variable used for checking whether the config file is provided as part
+		# of the -c option when invoking this tool.
+		self.config_available = False
+
+	def config_callback(self,option,opt,value,parser):
+		"""This function is called when this tool is called along with the -c option.
+		"""
+		try:
+			c=configfile.parse_config(value,self.config_spec)
+		except Exception, e:
+			print e
+			sys.exit(1)
+
+		self.process_config(c)
+
+	def process_config(self, cfg):
+		"""This function is used for extracting the required information from the 
+		config file provided as part of the input to the -c option.
+		"""
+		for name, v in cfg["close_monitor"].items():
+			self.listItems = v["names"]
+
+		# Once we have extracted the required information we set the status flag to true.
+		self.config_available = True
+	
+	def show_config_help(self, option, opt, value, parser):
+		"""This function is called when the tool is used with the -H option,
+		so that information on how to structure a config file is shown.
+		"""
+		configfile.get_spec_help(sys.stdout, self.config_spec)
+		sys.exit(0)
+
+	def main(self):
+		"""This is the main function where we inculcate the features like providing command line options, 
+		We also use the information extracted to kill the appropriate systemMonitor tool running in the system.
+		"""
+		parser = optparse.OptionParser()
+		parser.add_option("-C","--config", action="callback", callback=self.config_callback,
+				  type = "string", help="Configuration file to use")
+
+		parser.add_option("-H", "--config-help", action="callback", 
+				   callback=self.show_config_help, help="Show help for config files")
+
+		[garbage,names] = parser.parse_args()
+		
+		if not self.config_available:
+			print "No config file specified"
+			sys.exit(0)
+
+		print "Sessions to be closed ", self.listItems
+		
+		for v in self.listItems:
+			try:
+				f = open('/tmp/'+v+'.pid','r')
+				dict = pickle.load(f)
+				pids = dict['pid']
+		#		print "pid : ", pids
+				f.close()
+				os.system('kill -15 '+pids)
+				os.system('rm -f /tmp/'+v+'.pid')
+
+			except Exception, e:
+				print e
+				sys.exit(1)
+
+if __name__ == "__main__":
+	sMonitorExit = systemMonitorExit()
+	sMonitorExit.main()
+	
